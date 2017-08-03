@@ -24,7 +24,7 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 @click.option('--verbose', help="Print the filenames as they are being read",
               is_flag=True)
 @click.option('--port', help="Changes the port where the app is being "
-                             "hosted from", default='8050')
+                             "hosted from", default=8050, type=int)
 @click.option('--host', help="Changes the host from which the app is being "
                              "hosted (i.e. global or local host). Default is "
                              "None (localhost). Change to '0.0.0.0' for "
