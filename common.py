@@ -260,8 +260,7 @@ class Plates(object):
 
     @staticmethod
     def load_plate_metadata(data_folder, metadata):
-        # Load clean version of if it exists, else create it.
-
+        """load and clean the plate metadata"""
         original_filename = os.path.join(data_folder, metadata)
         original_metadata = pd.read_csv(original_filename, index_col=0)
         return Plates.clean_plate_metadata(original_metadata)
