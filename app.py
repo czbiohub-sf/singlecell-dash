@@ -19,9 +19,8 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 @click.command()
 @click.option('--data-folder', default='data', help='Location of data files')
-@click.option('--metadata', default='plate_metadata.csv',
-              help='Location of metadata file describing each plate, '
-                   'relative to "--data-folder"')
+@click.option('--metadata', default='data/plate_metadata.csv',
+              help='Full path of metadata file describing each plate')
 @click.option('--verbose', help="Print the filenames as they are being read",
               is_flag=True)
 @click.option('--port', help="Changes the port where the app is being "

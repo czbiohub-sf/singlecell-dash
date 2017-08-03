@@ -82,8 +82,10 @@ class Plates(object):
 
         self.plate_summaries = self.calculate_plate_summaries()
 
-        self.plate_metadata = self.load_plate_metadata(data_folder, metadata)
-        self.plate_metadata = self.plate_metadata.loc[self.plate_summaries.index]
+        original_metadata = pd.read_csv(metadata, index_col=0)
+        self.plate_metadata = self.clean_plate_metadata(original_metadata)
+        self.plate_metadata = self.plate_metadata.loc[
+            self.plate_summaries.index]
 
         if not os.path.exists(os.path.join(data_folder, 'coords')):
             os.mkdir(os.path.join(data_folder, 'coords'))
@@ -257,13 +259,6 @@ class Plates(object):
         # Use only the metadata for the plates that have been sequenced
         plate_metadata = plate_metadata.dropna(how='all', axis=1)
         return plate_metadata
-
-    @staticmethod
-    def load_plate_metadata(data_folder, metadata):
-        """load and clean the plate metadata"""
-        original_filename = os.path.join(data_folder, metadata)
-        original_metadata = pd.read_csv(original_filename, index_col=0)
-        return Plates.clean_plate_metadata(original_metadata)
 
     def compute_bulk_smushing(self):
         """Get average signal from each plate ('bulk') and find 2d embedding"""
