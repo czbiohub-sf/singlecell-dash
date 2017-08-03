@@ -262,15 +262,9 @@ class Plates(object):
     def load_plate_metadata(data_folder, metadata):
         # Load clean version of if it exists, else create it.
 
-        filename = os.path.join(data_folder, 'plate_metadata.csv')
-
         original_filename = os.path.join(data_folder, metadata)
         original_metadata = pd.read_csv(original_filename, index_col=0)
-        plate_metadata = Plates.clean_plate_metadata(original_metadata)
-        plate_metadata.to_csv(filename)
-
-        plate_metadata = pd.read_csv(filename, index_col=0)
-        return plate_metadata
+        return Plates.clean_plate_metadata(original_metadata)
 
     def compute_bulk_smushing(self):
         """Get average signal from each plate ('bulk') and find 2d embedding"""
