@@ -365,10 +365,12 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                 html.P('''This dashboard is under heavy development and we 
 would love to hear your feedback. You can send us a message in the CZ Biohub 
 #dashboard-feedback Slack channel (preferred), 
-or send us an email at datascience@czbiohub.org.
-    ''', className='row')
+or send us an email at datascience@czbiohub.org. Or, if you're feeling super 
+cool (and have a GitHub account), use GitHub to submit an issue to our bug 
+tracker below!
+    ''', className='row'),
                        # style={'padding-top': '20px'}),
-
+            dcc.Link('Submit an issue on GitHub!', href="https://github.com/czbiohub/singlecell-dash/issues/new")
             ])
         ]),
     ],
