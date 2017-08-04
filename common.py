@@ -34,6 +34,7 @@ def clean_mapping_stats(mapping_stats_original):
     numeric = mapping_stats_original.apply(maybe_to_numeric)
     return numeric
 
+
 def diff_exp(counts, group1, group2):
     """Computes differential expression between group 1 and group 2
     for each column in the dataframe counts.
@@ -63,7 +64,8 @@ class Plates(object):
     PERCENT_ERCC = 'percent_ercc'
     PERCENT_MAPPED_READS = 'percent_mapped_reads'
 
-    def __init__(self, data_folder, metadata, verbose=False):
+    def __init__(self, data_folder, metadata, genes_to_drop='Rn45s',
+                 verbose=False):
 
         plates_folder = os.path.join(data_folder, 'plates')
 
@@ -75,10 +77,6 @@ class Plates(object):
             index_col=[0, 1, 2, 3], verbose=verbose)
         self.genes, self.cell_metadata, self.mapping_stats = \
             self.clean_and_reformat(counts, mapping_stats)
-
-        # Get a counts per million rescaling of the genes
-        self.counts_per_million = self.genes.divide(self.genes.sum(axis=1),
-                                                    axis=0) * 1e6
 
         self.plate_summaries = self.calculate_plate_summaries()
 
@@ -100,6 +98,13 @@ class Plates(object):
 
         self.gene_names = sorted(self.genes.columns)
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
+
+        # Remove pesky genes
+        self.genes.drop(genes_to_drop, axis=1, inplace=True)
+
+        # Get a counts per million rescaling of the genes
+        self.counts_per_million = self.genes.divide(self.genes.sum(axis=1),
+                                                    axis=0) * 1e6
         self.top_genes = self.compute_top_genes_per_cell()
 
         self.data = {'genes': self.genes,
@@ -273,10 +278,10 @@ class Plates(object):
                 return smushed
 
         # if the cache was missing or invalid, compute a new projection
-        correlations = grouped.mean().T.rank().corr()
-        smusher = TSNE(random_state=0)
-        smushed = pd.DataFrame(smusher.fit_transform(correlations),
-                               index=correlations.index)
+        medians = grouped.median()
+        smusher = TSNE(random_state=0, perplexity=10, metric='cosine')
+        smushed = pd.DataFrame(smusher.fit_transform(medians),
+                               index=medians.index)
 
         smushed.to_csv(self.bulk_smushed_cache_file)
 
@@ -296,11 +301,10 @@ class Plates(object):
 
         for plate_name, genes_subset in grouped:
             if plate_name not in smusheds:
-                cell_correlations = genes_subset.T.rank().corr()
                 cell_smusher = TSNE(metric='cosine', random_state=0)
                 cell_smushed = pd.DataFrame(
-                    cell_smusher.fit_transform(cell_correlations),
-                    index=cell_correlations.index)
+                    cell_smusher.fit_transform(genes_subset),
+                    index=genes_subset.index)
                 smusheds[plate_name] = cell_smushed
 
         pd.to_pickle(smusheds, self.cell_smushed_cache_file)
