@@ -45,6 +45,7 @@ def cli(data_folder, metadata, verbose, port, host, javascript, debug):
 
     app.css.append_css({"external_url":
                             "https://codepen.io/chriddyp/pen/bWLwgP.css"})
+    app.scripts.append_script({"external_url": "http://maca.czbiohub.net/ga.js"})
 
 
     # these aren't all working at the moment, may be a bug in Dash
