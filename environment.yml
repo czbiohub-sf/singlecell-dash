@@ -45,7 +45,7 @@ dependencies:
   - click
   - colorlover
   - dash>=0.17.7
-  - dash_core_components==0.10rc1
+  - dash_core_components>=0.11
   - dash-html-components>=0.6.2
   - dash-renderer>=0.7.3
   - flask
