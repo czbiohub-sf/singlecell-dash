@@ -239,12 +239,12 @@ class Plates(object):
                 if not x:
                     return np.nan
                 if x.endswith('/2017'):
-                    return datetime.datetime.strptime(x,'%m/%d/%Y')
+                    return datetime.datetime.strptime(x, '%m/%d/%Y')
                 elif x.endswith('/17'):
-                    return datetime.datetime.strptime(x,'%m/%d/%y')
+                    return datetime.datetime.strptime(x, '%m/%d/%y')
                 else:
                     return datetime.datetime.strptime(x, '%y%m%d')
-            elif isinstance(x,float):
+            elif isinstance(x, float):
                 return datetime.datetime.strptime(str(int(x)), '%y%m%d')
             else:
                 raise TypeError
