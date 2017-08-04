@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.manifold import TSNE
 import scipy.stats as stats
-
+from collections import OrderedDict
 
 
 def combine_cell_files(folder, globber, verbose=False, **kwargs):
@@ -29,9 +29,14 @@ def maybe_to_numeric(series):
 
 def clean_mapping_stats(mapping_stats_original):
     """Remove whitespace from all values and convert to numbers"""
+
     mapping_stats_original = mapping_stats_original.applymap(
         lambda x: x.strip().strip('%') if isinstance(x, str) else x)
+
     numeric = mapping_stats_original.apply(maybe_to_numeric)
+
+    numeric.columns = numeric.columns.map(str.strip)
+
     return numeric
 
 
@@ -59,10 +64,10 @@ def diff_exp(counts, group1, group2):
 class Plates(object):
 
     # Names of commonly accessed columns
-    MEAN_READS_PER_CELL = 'mean_reads_per_cell'
-    MEDIAN_GENES_PER_CELL = 'median_n_genes_per_cell'
-    PERCENT_ERCC = 'percent_ercc'
-    PERCENT_MAPPED_READS = 'percent_mapped_reads'
+    MEAN_READS_PER_CELL = 'Mean reads per well'
+    MEDIAN_GENES_PER_CELL = 'Median genes per well'
+    PERCENT_ERCC = 'Percent ERCC'
+    PERCENT_MAPPED_READS = 'Percent mapped to genome'
 
     def __init__(self, data_folder, metadata, genes_to_drop='Rn45s',
                  verbose=False):
@@ -190,33 +195,33 @@ class Plates(object):
 
     def calculate_plate_summaries(self):
         """Get mean reads, percent mapping, etc summaries for each plate"""
-        means = self.cell_metadata.groupby('WELL_MAPPING').mean()
-        means.columns = [f'mean_{x}' for x in means.columns]
+        well_map = self.cell_metadata.groupby('WELL_MAPPING')
 
-        medians = self.cell_metadata.groupby('WELL_MAPPING').median()
-        medians.columns = [f'median_{x}' for x in medians.columns]
+        # these stats are from STAR mapping
+        star_cols = ['Number of input reads', 'Uniquely mapped reads number']
+        star_stats = self.mapping_stats[star_cols].groupby(
+                self.cell_metadata['WELL_MAPPING']).sum()
 
-        rn45s = self.genes['Rn45s'].groupby(
-            self.cell_metadata['WELL_MAPPING']).mean()
-        means_with_rn45s = pd.concat([means, rn45s], axis=1)
+        total_reads = star_stats['Number of input reads']
+        unique_reads = star_stats['Uniquely mapped reads number']
 
-        percents = 100 * means_with_rn45s.divide(means['mean_total_reads'],
-                                                 axis=0)
-        percents.columns = [x.replace('mean', 'percent') for x in percents]
-        percents = percents.rename(columns={'Rn45s': 'percent_Rn45s'})
-        plate_summaries = pd.concat([means, medians, percents], axis=1)
-        cols = ['mean_total_reads', 'median_n_genes', 'percent_mapped_reads',
-                'percent_ercc',
-                'percent_alignment_not_unique', 'percent_no_feature',
-                'percent_Rn45s']
-        plate_summaries = plate_summaries[cols]
-        plate_summaries['n_cells'] = self.genes.groupby(
-            self.cell_metadata['WELL_MAPPING']).size()
+        meta_cols = ['ercc', 'alignment_not_unique', 'no_feature']
 
-        # Rename columns to specify this is per cell fo each plate
-        plate_summaries = plate_summaries.rename(
-            columns={'mean_total_reads': 'mean_reads_per_cell',
-                     'median_n_genes': 'median_n_genes_per_cell'})
+        percent_ercc = well_map.sum()['ercc'].divide(total_reads, axis=0)
+        percent_mapped_reads = unique_reads / total_reads - percent_ercc
+
+        plate_summaries = pd.DataFrame(OrderedDict([
+            (Plates.MEAN_READS_PER_CELL, total_reads / well_map.size()),
+            (Plates.MEDIAN_GENES_PER_CELL, well_map.median()['n_genes']),
+            ('Percent not uniquely aligned', well_map.sum()['alignment_not_unique'].divide(total_reads, axis=0)),
+            (Plates.PERCENT_MAPPED_READS, percent_mapped_reads),
+            ('Percent no feature', well_map.sum()['no_feature'].divide(total_reads, axis=0)),
+            ('Percent Rn45s', self.genes['Rn45s'].groupby(
+                    self.cell_metadata['WELL_MAPPING']).sum() / total_reads),
+            (Plates.PERCENT_ERCC, percent_ercc),
+            ('n_wells', well_map.size())
+        ]))
+
         return plate_summaries
 
     @staticmethod

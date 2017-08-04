@@ -629,8 +629,8 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript, d
         elif isinstance(value, str):
             return value
         elif 'percent' in item.name.lower():
-            return '{:.2g}%'.format(value)
-        elif isinstance(value, pd._libs.tslib.Timestamp):
+            return '{:.2f}%'.format(value * 100.)
+        elif isinstance(value, pd.Timestamp):
             return str(np.datetime64(value, 'D'))
         elif (isinstance(value, float)  # this must go before ints!
               or np.issubdtype(value, np.number)):
