@@ -34,6 +34,7 @@ def clean_mapping_stats(mapping_stats_original):
     numeric = mapping_stats_original.apply(maybe_to_numeric)
     return numeric
 
+
 def diff_exp(counts, group1, group2):
     """Computes differential expression between group 1 and group 2
     for each column in the dataframe counts.
@@ -273,10 +274,10 @@ class Plates(object):
                 return smushed
 
         # if the cache was missing or invalid, compute a new projection
-        correlations = grouped.mean().T.rank().corr()
-        smusher = TSNE(random_state=0)
-        smushed = pd.DataFrame(smusher.fit_transform(correlations),
-                               index=correlations.index)
+        medians = grouped.median()
+        smusher = TSNE(random_state=0, perplexity=10, metric='cosine')
+        smushed = pd.DataFrame(smusher.fit_transform(medians),
+                               index=medians.index)
 
         smushed.to_csv(self.bulk_smushed_cache_file)
 
@@ -296,11 +297,10 @@ class Plates(object):
 
         for plate_name, genes_subset in grouped:
             if plate_name not in smusheds:
-                cell_correlations = genes_subset.T.rank().corr()
                 cell_smusher = TSNE(metric='cosine', random_state=0)
                 cell_smushed = pd.DataFrame(
-                    cell_smusher.fit_transform(cell_correlations),
-                    index=cell_correlations.index)
+                    cell_smusher.fit_transform(genes_subset),
+                    index=genes_subset.index)
                 smusheds[plate_name] = cell_smushed
 
         pd.to_pickle(smusheds, self.cell_smushed_cache_file)
