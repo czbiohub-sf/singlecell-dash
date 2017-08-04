@@ -124,9 +124,9 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                 dcc.Graph(
                         id='plate_summary2',
                         figure={"data": [go.Scatter(
-                                x=plates.plate_summaries[
+                                x=100*plates.plate_summaries[
                                     plates.PERCENT_ERCC],
-                                y=plates.plate_summaries[
+                                y=100*plates.plate_summaries[
                                     plates.PERCENT_MAPPED_READS],
                                 mode='markers', hoverinfo='text',
                                 text=plates.plate_summaries.index)],
@@ -362,11 +362,11 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
             #                 href='https://github.com/czbiohub/singlecell-dash/issues/new'),
             # ], className='row',),
             html.Div([
-                html.P('''This dashboard is under heavy development and we 
-would love to hear your feedback. You can send us a message in the CZ Biohub 
-#dashboard-feedback Slack channel (preferred), 
-or send us an email at datascience@czbiohub.org. Or, if you're feeling super 
-cool (and have a GitHub account), use GitHub to submit an issue to our bug 
+                html.P('''This dashboard is under heavy development and we
+would love to hear your feedback. You can send us a message in the CZ Biohub
+#dashboard-feedback Slack channel (preferred),
+or send us an email at datascience@czbiohub.org. Or, if you're feeling super
+cool (and have a GitHub account), use GitHub to submit an issue to our bug
 tracker below!
     ''', className='row'),
                        # style={'padding-top': '20px'}),
@@ -636,7 +636,7 @@ tracker below!
 
     def maybe_format(item):
         """Pretty-format a string, integer, float, or percent
-    
+
         Parameters
         ----------
         item : pandas.Series
