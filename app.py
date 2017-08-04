@@ -29,14 +29,20 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
                              "hosted (i.e. global or local host). Default is "
                              "None (localhost). Change to '0.0.0.0' for "
                              "global host", default=None)
+@click.option('--javascript',
+              help="Location of an arbitrary javacsript file you want to add"
+                   " to the Dash app", default=None)
 @click.option('--debug', help="Run the Dash server in debug mode",
               is_flag=True)
 @click.version_option(version='v0.1.0')
-def cli(data_folder, metadata, verbose, port, host, debug):
+def cli(data_folder, metadata, verbose, port, host, javascript, debug):
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
     plates = Plates(data_folder, metadata, verbose)
 
     app = dash.Dash()
+    if javascript is not None:
+        app.scripts.append_script({"external_url": javascript})
+
     app.css.append_css({"external_url":
                             "https://codepen.io/chriddyp/pen/bWLwgP.css"})
 
