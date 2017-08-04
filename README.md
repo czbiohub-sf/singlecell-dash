@@ -1,6 +1,6 @@
 # singlecell-dash
 
-Dashboard for visualizing per-plate sequencing quality metrics and basic 
+Dashboard for visualizing per-plate sequencing quality metrics and basic
 analysis for a single-cell RNA-seq project.
 
 
@@ -32,3 +32,27 @@ $ python app.py
 
 NB: If you CTRL+Z or CTRL+X instead of CTRL+C, the 8050 port will still be in
 use :( -- so you'll have to close your terminal window/tab and start anew.
+
+
+To get help, check out the options with `--help`:
+
+```
+$ python app.py --help
+Usage: app.py [OPTIONS]
+
+  Run a dashboard showing sequencing QC of single-cell RNA-seq plates
+
+Options:
+  --data-folder TEXT  Location of data files
+  --metadata TEXT     Full path of metadata file describing each plate
+  --verbose           Print the filenames as they are being read
+  --port INTEGER      Changes the port where the app is being hosted from
+  --host TEXT         Changes the host from which the app is being hosted
+                      (i.e. global or local host). Default is None
+                      (localhost). Change to '0.0.0.0' for global host
+  --javascript TEXT   Location of an arbitrary javacsript file you want to add
+                      to the Dash app
+  --debug             Run the Dash server in debug mode
+  --version           Show the version and exit.
+  --help              Show this message and exit.
+```
