@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.manifold import TSNE
 import scipy.stats as stats
-
+from collections import OrderedDict
 
 
 def combine_cell_files(folder, globber, verbose=False, **kwargs):
@@ -64,10 +64,10 @@ def diff_exp(counts, group1, group2):
 class Plates(object):
 
     # Names of commonly accessed columns
-    MEAN_READS_PER_CELL = 'mean_reads_per_well'
-    MEDIAN_GENES_PER_CELL = 'median_genes_per_well'
-    PERCENT_ERCC = 'percent_ercc'
-    PERCENT_MAPPED_READS = 'percent_mapped_reads'
+    MEAN_READS_PER_CELL = 'Mean reads per well'
+    MEDIAN_GENES_PER_CELL = 'Median genes per well'
+    PERCENT_ERCC = 'Percent ERCC'
+    PERCENT_MAPPED_READS = 'Percent mapped to genome'
 
     def __init__(self, data_folder, metadata, verbose=False):
 
@@ -203,26 +203,20 @@ class Plates(object):
 
         meta_cols = ['ercc', 'alignment_not_unique', 'no_feature']
 
-        plate_summaries = pd.concat([
-            total_reads / well_map.size(),
-            unique_reads / total_reads,
-            well_map.median()['n_genes'],
-            well_map.sum()[meta_cols].divide(total_reads, axis=0),
-            self.genes['Rn45s'].groupby(
-                    self.cell_metadata['WELL_MAPPING']).sum() / total_reads,
-            well_map.size()
+        percent_ercc = well_map.sum()['ercc'].divide(total_reads, axis=0)
+        percent_mapped_reads = unique_reads / total_reads - percent_ercc
 
-        ], axis=1)
-
-
-        plate_summaries.columns = ['mean_reads_per_well',
-                                   'percent_mapped_reads',
-                                   'median_genes_per_well',
-                                   'percent_ercc',
-                                   'percent_alignment_not_unique',
-                                   'percent_no_feature',
-                                   'percent_Rn45s',
-                                   'n_wells']
+        plate_summaries = pd.DataFrame(OrderedDict([
+            (Plates.MEAN_READS_PER_CELL, total_reads / well_map.size()),
+            (Plates.MEDIAN_GENES_PER_CELL, well_map.median()['n_genes']),
+            ('Percent not uniquely aligned', well_map.sum()['alignment_not_unique'].divide(total_reads, axis=0)),
+            (Plates.PERCENT_MAPPED_READS, percent_mapped_reads),
+            ('Percent no feature', well_map.sum()['no_feature'].divide(total_reads, axis=0)),
+            ('Percent Rn45s', self.genes['Rn45s'].groupby(
+                    self.cell_metadata['WELL_MAPPING']).sum() / total_reads),
+            (Plates.PERCENT_ERCC, percent_ercc),
+            ('n_wells', well_map.size())
+        ]))
 
         return plate_summaries
 
