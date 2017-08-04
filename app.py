@@ -613,29 +613,25 @@ def cli(data_folder, metadata, verbose, port, host, debug):
             first (0th) index
         """
         value = item[0]
-        try:
-            if pd.isnull(value):
-                return 'N/A'
-            elif isinstance(value, str):
-                return value
-            elif 'percent' in item.name.lower():
-                return '{:.2g}%'.format(value)
-            elif isinstance(value, pd._libs.tslib.Timestamp):
-                return str(np.datetime64(value, 'D'))
-            elif (isinstance(value, float)  # this must go before ints!
-                  or np.issubdtype(value, np.number)):
-                if value >= 1e3:
-                    return locale.format("%d", int(value), grouping=True)
-                else:
-                    return locale.format("%.3g", value, grouping=True)
-            elif (isinstance(value, int)
-                  or np.issubdtype(value, np.integer)):
-                return locale.format("%d", value, grouping=True)
+        if pd.isnull(value):
+            return 'N/A'
+        elif isinstance(value, str):
+            return value
+        elif 'percent' in item.name.lower():
+            return '{:.2g}%'.format(value)
+        elif isinstance(value, pd._libs.tslib.Timestamp):
+            return str(np.datetime64(value, 'D'))
+        elif (isinstance(value, float)  # this must go before ints!
+              or np.issubdtype(value, np.number)):
+            if value >= 1e3:
+                return locale.format("%d", int(value), grouping=True)
             else:
-                raise TypeError
-        except TypeError:
-            print(f'The unhappy value is {value} and its type is', type(value))
-
+                return locale.format("%.3g", value, grouping=True)
+        elif (isinstance(value, int)
+              or np.issubdtype(value, np.integer)):
+            return locale.format("%d", value, grouping=True)
+        else:
+            raise TypeError
 
     @app.callback(
         dash.dependencies.Output('plate_stats_table', 'children'),
