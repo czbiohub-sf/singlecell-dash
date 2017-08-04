@@ -39,7 +39,8 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 @click.option('--debug', help="Run the Dash server in debug mode",
               is_flag=True)
 @click.version_option(version='v0.1.0')
-def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript, debug):
+def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
+        debug):
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
     plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
                     verbose=verbose)
@@ -329,30 +330,49 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript, d
 
             html.Div([  # differential gene plots
                 html.H4('Differential Expression', className='row',
-                        style = {'padding-top': '20px'}),
+                        style={'padding-top': '20px'}),
 
                 html.Div([
                     dcc.RadioItems(
-                            id='expression-type',
-                            options=[{'label': i, 'value': i} for i in
-                                     ['High Expression', 'Low Expression']],
-                            value='High Expression',
-                            labelStyle={'display': 'inline-block'}
+                        id='expression-type',
+                        options=[{'label': i, 'value': i} for i in
+                                 ['High Expression', 'Low Expression']],
+                        value='High Expression',
+                        labelStyle={'display': 'inline-block'}
                     )
                 ],
-                        className='row'
+                    className='row'
                 ),
 
                 # differential expression plot
                 dcc.Graph(id='diff_exp',
                           config=config_dict.copy()),
             ],
-                    className='six columns'
+                className='six columns'
             ),
 
         ],
             className='row'
-        )
+        ),
+        html.Div([
+            html.H2('Send feedback!', className='row',
+                    style={'padding-top': '20px'}),
+            # html.Div([
+            #     html.Button('Submit feedback!', className='three columns',
+            #                 href='https://github.com/czbiohub/singlecell-dash/issues/new'),
+            # ], className='row',),
+            html.Div([
+                html.P('''This dashboard is under heavy development and we 
+would love to hear your feedback. You can send us a message in the CZ Biohub 
+#dashboard-feedback Slack channel (preferred), 
+or send us an email at datascience@czbiohub.org. Or, if you're feeling super 
+cool (and have a GitHub account), use GitHub to submit an issue to our bug 
+tracker below!
+    ''', className='row'),
+                       # style={'padding-top': '20px'}),
+            dcc.Link('Submit an issue on GitHub!', href="https://github.com/czbiohub/singlecell-dash/issues/new")
+            ])
+        ]),
     ],
             className='ten columns offset-by-one'
     )
