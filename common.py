@@ -228,7 +228,7 @@ class Plates(object):
 
         # Hard-coded column name of 21_55_F is actually the sample id column
         plate_metadata = plate_metadata.rename(
-            columns={'21_55_F': 'Sample ID'})
+            columns={'mouse.id': 'Sample ID'})
 
         plate_metadata['Age (months)'] = plate_metadata['Sample ID'].map(
             lambda x: x.split('_')[0] if isinstance(x, str) else '')
