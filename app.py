@@ -206,7 +206,8 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                     options=[{'label': i, 'value': i} for i in
                              plates.plate_summaries.index],
                     value=plates.plate_summaries.index[0],
-                    className='four columns'
+                    className='four columns',
+                    clearable=False
             ),
         ],
                 className='row'
