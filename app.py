@@ -429,7 +429,7 @@ tracker below!
                                          in enumerate(plates.top_genes[x])]))
 
         if selectedData and selectedData['points']:
-            barcodes = [d['customdata'] for d in selectedData['points']]
+            barcodes = {d['customdata'] for d in selectedData['points']}
 
             alpha.loc[~alpha.index.isin(barcodes)] = 0.1
             hovertext[~hovertext.index.isin(barcodes)] = ''
@@ -577,26 +577,29 @@ tracker below!
         plate_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
             plate_name]
         genes_subset = plates.genes.loc[plate_barcodes]
+        alpha = pd.Series(1.0, index=genes_subset.index)
 
         if selectedData and selectedData['points']:
-            barcodes = [d['customdata'] for d in selectedData['points']]
-            genes_subset = genes_subset.loc[barcodes, :]
+            barcodes = {d['customdata'] for d in selectedData['points']}
+            alpha.loc[~alpha.index.isin(barcodes)] = 0.1
 
         return {
-            'data'  : [go.Scatter(
-                    x=genes_subset[xaxis_column_name],
-                    y=genes_subset[yaxis_column_name],
-                    text=genes_subset.index,
-                    mode='markers',
-            )],
+            'data': [
+                go.Scatter(x=genes_subset[xaxis_column_name],
+                           y=genes_subset[yaxis_column_name],
+                           marker={'opacity': alpha},
+                           text=genes_subset.index,
+                           mode='markers')
+            ],
             'layout': go.Layout(
                     xaxis={
-                        'title'    : xaxis_column_name,
-                        'type'     : ('log', 'linear')[xaxis_type == 'Linear'],
+                        'title': xaxis_column_name,
+                        'type' : ('log', 'linear')[xaxis_type == 'Linear'],
                     },
                     yaxis={
                         'title'      : yaxis_column_name,
-                        'type'       : ('log', 'linear')[yaxis_type == 'Linear'],
+                        'type'       : ('log', 'linear')[
+                            yaxis_type == 'Linear'],
                         'scaleanchor': 'x'
                     },
                     margin={'l': 40, 'b': 40, 't': 10, 'r': 0},
