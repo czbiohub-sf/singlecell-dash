@@ -578,18 +578,24 @@ tracker below!
             plate_name]
         genes_subset = plates.genes.loc[plate_barcodes]
         alpha = pd.Series(1.0, index=genes_subset.index)
+        hovertext = genes_subset[[xaxis_column_name, yaxis_column_name]].apply(
+                lambda x: '{}: {}, {}'.format(x.name, x[0], x[1]), 1
+        )
+
 
         if selectedData and selectedData['points']:
             barcodes = {d['customdata'] for d in selectedData['points']}
             alpha.loc[~alpha.index.isin(barcodes)] = 0.1
+            hovertext[~hovertext.index.isin(barcodes)] = ''
 
         return {
             'data': [
                 go.Scatter(x=genes_subset[xaxis_column_name],
                            y=genes_subset[yaxis_column_name],
                            marker={'opacity': alpha},
-                           text=genes_subset.index,
-                           mode='markers')
+                           mode='markers',
+                           hoverinfo='text',
+                           text=hovertext.values)
             ],
             'layout': go.Layout(
                     xaxis={
