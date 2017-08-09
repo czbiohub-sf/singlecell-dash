@@ -105,7 +105,7 @@ class Plates(object):
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
 
         # Remove pesky genes
-        self.genes.drop(genes_to_drop, axis=1, inplace=True)
+        self.genes = self.genes.drop(genes_to_drop, axis=1)
 
         # Get a counts per million rescaling of the genes
         self.counts_per_million = self.genes.divide(self.genes.sum(axis=1),
