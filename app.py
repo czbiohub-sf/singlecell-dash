@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 
-from common import diff_exp, Plates
+from common import diff_exp, mannwhitney_diff_exp, Plates
 
 
 # Use commas to separate thousands
@@ -334,15 +334,32 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                         style={'padding-top': '20px'}),
 
                 html.Div([
-                    dcc.RadioItems(
-                        id='expression-type',
-                        options=[{'label': i, 'value': i} for i in
-                                 ['High Expression', 'Low Expression']],
-                        value='High Expression',
-                        labelStyle={'display': 'inline-block'}
-                    )
+                    html.Div([
+                        dcc.RadioItems(
+                                id='expression-type',
+                                options=[{'label': i, 'value': i} for i in
+                                         ['High Expression',
+                                          'Low Expression']],
+                                value='High Expression',
+                                labelStyle={'display': 'inline-block'},
+                        )
+                    ],
+                            className='six columns'
+                    ),
+
+                    html.Div([
+                        dcc.RadioItems(
+                                id='expression-test',
+                                options=[{'label': i, 'value': i} for i in
+                                         ['t-test', 'Mann-Whitney']],
+                                value='t-test',
+                                labelStyle={'display': 'inline-block'},
+                        )
+                    ],
+                            className='six columns'
+                    ),
                 ],
-                    className='row'
+                        className='row'
                 ),
 
                 # differential expression plot
@@ -457,13 +474,14 @@ tracker below!
 
     @app.callback(
             dash.dependencies.Output('expression-type', 'options'),
-            [dash.dependencies.Input('single_plate_tsne', 'selectedData')])
-    def update_diff_exp_ctrl(selectedDataTSNE=None):
-        if selectedDataTSNE is not None:
-            return [{'label': i, 'value': i} for i in
+            [dash.dependencies.Input('single_plate_tsne', 'selectedData'),
+             dash.dependencies.Input('expression-test', 'value')])
+    def update_diff_exp_ctrl(selectedDataTSNE=None, expression_test=None):
+        if selectedDataTSNE is None or expression_test == 'Mann-Whitney':
+            return [{'label': i, 'value': i, 'disabled': True} for i in
                     ['High Expression', 'Low Expression']]
         else:
-            return [{'label': i, 'value': i, 'disabled': True} for i in
+            return [{'label': i, 'value': i} for i in
                     ['High Expression', 'Low Expression']]
 
 
@@ -473,9 +491,11 @@ tracker below!
              dash.dependencies.Input('single_plate_reads_vs_genes',
                                      'selectedData'),
              dash.dependencies.Input('single_plate_tsne', 'selectedData'),
-             dash.dependencies.Input('expression-type', 'value')])
+             dash.dependencies.Input('expression-type', 'value'),
+             dash.dependencies.Input('expression-test', 'value')])
     def update_diff_exp(plate_name, selectedDataQC=None,
-                        selectedDataTSNE=None, expression_type=None):
+                        selectedDataTSNE=None,
+                        expression_type=None, expression_test=None):
         all_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
             plate_name]
 
@@ -497,18 +517,32 @@ tracker below!
             unselected_barcodes = [b for b in all_barcodes if
                                    b not in selected_barcodes]
             selected_barcodes = list(selected_barcodes)
-            diff_stats = diff_exp(log_counts, selected_barcodes,
-                                  unselected_barcodes)
 
-            # Bonferroni cutoff
-            z_scores = diff_stats[diff_stats['p'] < 0.05 / len(diff_stats)]['z']
+            if expression_test == 't-test':
+                diff_stats = diff_exp(log_counts, selected_barcodes,
+                                      unselected_barcodes)
 
-            if expression_type == "High Expression":
-                z_scores = z_scores[z_scores > 0]
-                genes_to_show = list(z_scores.nlargest(5).index)[::-1]
+                # Bonferroni cutoff
+                z_scores = diff_stats[diff_stats['p'] < 0.05
+                                      / len(diff_stats)]['z']
+
+                if expression_type == "High Expression":
+                    z_scores = z_scores[z_scores > 0]
+                    genes_to_show = list(z_scores.nlargest(5).index)[::-1]
+                else:
+                    z_scores = z_scores[z_scores < 0]
+                    genes_to_show = list(z_scores.nsmallest(5).index)[::-1]
             else:
-                z_scores = z_scores[z_scores < 0]
-                genes_to_show = list(z_scores.nsmallest(5).index)[::-1]
+                diff_stats = mannwhitney_diff_exp(log_counts,
+                                                  selected_barcodes,
+                                                  unselected_barcodes)
+
+                # Bonferroni cutoff
+                u_scores = diff_stats[diff_stats['p'] < 0.05
+                                      / len(diff_stats)]['u']
+                genes_to_show = list(u_scores.nlargest(5).index)[::-1]
+
+
 
             if not genes_to_show:
                 return {
