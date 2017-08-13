@@ -44,19 +44,19 @@ def diff_exp(counts, group1, group2):
     """Computes differential expression between group 1 and group 2
     for each column in the dataframe counts.
 
-    Returns a dataframe of Z-scores and p-values."""
+    Returns a dataframe of t statistics and p-values."""
 
-    mean_diff = counts.loc[group1].mean() - counts.loc[group2].mean()
-    pooled_sd = np.sqrt(counts.loc[group1].var()/len(group1)
-                        + counts.loc[group2].var()/len(group2))
-    z_scores = mean_diff/pooled_sd
-    z_scores = z_scores.fillna(0)
+    # otherwise we'll get endless warnings about NaNs, which we can ignore
+    with np.errstate(invalid='ignore'):
+        tt_res = st.ttest_ind(counts.loc[group1].as_matrix(),
+                              counts.loc[group2].as_matrix(),
+                              axis=0)
 
-    # t-test
-    p_vals = (1 - stats.norm.cdf(np.abs(z_scores)))*2
+    df = pd.DataFrame({'t': tt_res.statistic, 'p': tt_res.pvalue},
+                      columns=['t', 'p'], index=counts.columns)
 
-    df = pd.DataFrame({'z': z_scores})
-    df['p'] = p_vals
+    df['t'].fillna(0, inplace=True)
+    df['p'].fillna(1, inplace=True)
 
     return df
 
