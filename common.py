@@ -44,21 +44,114 @@ def diff_exp(counts, group1, group2):
     """Computes differential expression between group 1 and group 2
     for each column in the dataframe counts.
 
-    Returns a dataframe of Z-scores and p-values."""
+    Returns a dataframe of t statistics and p-values."""
 
-    mean_diff = counts.loc[group1].mean() - counts.loc[group2].mean()
-    pooled_sd = np.sqrt(counts.loc[group1].var()/len(group1)
-                        + counts.loc[group2].var()/len(group2))
-    z_scores = mean_diff/pooled_sd
-    z_scores = z_scores.fillna(0)
+    # otherwise we'll get endless warnings about NaNs, which we can ignore
+    with np.errstate(invalid='ignore'):
+        tt_res = st.ttest_ind(counts.loc[group1].as_matrix(),
+                              counts.loc[group2].as_matrix(),
+                              axis=0)
 
-    # t-test
-    p_vals = (1 - stats.norm.cdf(np.abs(z_scores)))*2
+    df = pd.DataFrame({'t': tt_res.statistic, 'p': tt_res.pvalue},
+                      columns=['t', 'p'], index=counts.columns)
 
-    df = pd.DataFrame({'z': z_scores})
-    df['p'] = p_vals
+    df['t'].fillna(0, inplace=True)
+    df['p'].fillna(1, inplace=True)
 
     return df
+
+
+def rankdata(a):
+    arr = np.asarray(a)
+
+    # argsort each column
+    sorter = np.argsort(arr, 0)
+
+    ix = sorter.ravel('F')
+    iy = np.repeat(np.arange(arr.shape[1]), arr.shape[0])
+
+    inv = np.empty(arr.shape, dtype=np.intp)
+    inv[ix,iy] = np.tile(np.arange(arr.shape[0], dtype=np.intp), arr.shape[1])
+
+    arr = arr[ix, iy].reshape(arr.shape, order='F')
+
+    obs = np.r_['0',
+                np.ones((1, arr.shape[1]), dtype=bool),
+                arr[1:,:] != arr[:-1,:],
+                np.ones((1, arr.shape[1]), dtype=bool)]
+
+    nzx, nzy = np.nonzero(obs.T)
+
+    xv,xc = np.unique(nzx, return_counts=True)
+    dense = obs.cumsum(axis=0)[inv.ravel('F'), iy] + np.r_[0, xc[:-1].cumsum()].repeat(arr.shape[0])
+
+    return 0.5 * (nzy[dense] + nzy[dense - 1] + 1).reshape(arr.shape, order='F')
+
+
+def tiecorrect(rankvals):
+    arr = np.sort(rankvals, axis=0)
+    size = np.float64(arr.shape[0])
+    if size < 2:
+        return 1.0
+
+    obs = np.r_['0',
+                np.ones((1, arr.shape[1]), dtype=bool),
+                arr[1:, :] != arr[:-1, :],
+                np.ones((1, arr.shape[1]), dtype=bool)]
+
+    nzx, nzy = np.nonzero(obs.T)
+
+    c = np.clip(np.diff(nzy), 0, None)
+    c2 = c ** 3 - c
+
+    return 1.0 - np.array(
+        list(map(np.sum, np.split(c2, np.where(c == 0)[0])))) / (
+                 size ** 3 - size)
+
+
+def mannwhitneyu(x, y, use_continuity=True):
+    """Version of Mann-Whitney U-test that handles arrays.
+
+    Only does two-sided tests at the moment. Which I'm not convinced is
+    implemented properly in scipy...need to check the math.
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+    assert x.shape[1] == y.shape[1]
+
+    n1 = x.shape[0]
+    n2 = y.shape[0]
+
+    ranked = rankdata(np.concatenate((x, y)))
+    rankx = ranked[0:n1, :]  # get the x-ranks
+    u1 = n1 * n2 + (n1 * (n1 + 1)) / 2.0 - np.sum(rankx,
+                                                  axis=0)  # calc U for x
+    u2 = n1 * n2 - u1  # remainder is U for y
+    T = tiecorrect(ranked)
+
+    # if *everything* is identical we'll raise an error, not otherwise
+    if np.all(T == 0):
+        raise ValueError('All numbers are identical in mannwhitneyu')
+    sd = np.sqrt(T * n1 * n2 * (n1 + n2 + 1) / 12.0)
+
+    meanrank = n1 * n2 / 2.0 + 0.5 * use_continuity
+    bigu = np.max(np.vstack([u1, u2]), 0)
+
+    z = np.zeros_like(T)
+    z[T != 0] = (bigu - meanrank)[T != 0] / sd[T != 0]
+
+    p = 2 * stats.distributions.norm.sf(abs(z))
+
+    u = u2
+    return u, p
+
+
+def mannwhitney_diff_exp(counts, group1, group2):
+    u, p = mannwhitneyu(counts.loc[group1].as_matrix(),
+                        counts.loc[group2].as_matrix())
+
+    return pd.DataFrame({'u': u, 'p': p}, columns=['u', 'p'],
+                        index=counts.columns)
 
 
 class Plates(object):
