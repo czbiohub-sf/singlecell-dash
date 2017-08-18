@@ -9,6 +9,9 @@ from collections import OrderedDict
 
 
 def combine_cell_files(folder, globber, verbose=False, **kwargs):
+    if verbose:
+        print('folder:', folder)
+        print('globber:', globber)
     dfs = []
 
     for filename in glob.iglob(os.path.join(folder, globber)):
@@ -77,11 +80,18 @@ class Plates(object):
         counts = combine_cell_files(
             plates_folder, '*.htseq-count-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose)
+
+        # Get 10x data too
+        self.counts10x = combine_cell_files(
+            os.path.join(plates_folder, '10x_data', '*'),
+            '*.mus.cell-gene.csv',
+            index_col=0, verbose=verbose)
+
         mapping_stats = combine_cell_files(
             plates_folder, '*.log-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose)
         self.genes, self.cell_metadata, self.mapping_stats = \
-            self.clean_and_reformat(counts, mapping_stats)
+            self.clean_and_reformat(counts, self.counts10x, mapping_stats)
 
         self.plate_summaries = self.calculate_plate_summaries()
 
@@ -105,6 +115,7 @@ class Plates(object):
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
 
         # Remove pesky genes
+        genes_to_drop = genes_to_drop.split(',')
         self.genes = self.genes.drop(genes_to_drop, axis=1)
 
         # Get a counts per million rescaling of the genes
@@ -129,7 +140,7 @@ class Plates(object):
         return s
 
     @staticmethod
-    def clean_and_reformat(counts, mapping_stats):
+    def clean_and_reformat(counts, counts10x, mapping_stats):
         """Move metadata information into separate dataframe and simplify ids
 
         Parameters
@@ -167,24 +178,29 @@ class Plates(object):
         mapping_stats.index = sample_ids
         counts.index = sample_ids
 
+        # cell_metadata.loc[]
+
+        # Combine counts files
+        counts_combined = pd.concat([counts, counts10x])
+
         # Extract htseq-count outputs and save as separate files
-        cols = [x for x in counts if x.startswith('__')]
-        count_stats = counts[cols]
+        cols = [x for x in counts_combined if x.startswith('__')]
+        count_stats = counts_combined[cols]
         count_stats.columns = [x.strip('_') for x in count_stats]
 
         # Separate spike-ins (ERCCs) and genes
-        ercc_names = [col for col in counts.columns[3:] if 'ERCC-' in col]
+        ercc_names = [col for col in counts_combined.columns[3:] if 'ERCC-' in col]
         gene_names = [col for col in counts.columns[3:] if
                       'ERCC-' not in col and col[0] != '_']
-        cell_metadata['total_reads'] = counts.sum(axis=1)
+        cell_metadata['total_reads'] = counts_combined.sum(axis=1)
 
         # Separate counts of everything from genes-only
-        genes = counts[gene_names]
+        genes = counts_combined[gene_names]
 
         # Add mapping and ERCC counts to cell metadata
         cell_metadata['n_genes'] = (genes > 0).sum(axis=1)
         cell_metadata['mapped_reads'] = genes.sum(axis=1)
-        cell_metadata['ercc'] = counts[ercc_names].sum(axis=1)
+        cell_metadata['ercc'] = counts_combined[ercc_names].sum(axis=1)
         cell_metadata = pd.concat([cell_metadata, count_stats], axis=1)
 
         # Remove not useful columns
@@ -207,15 +223,16 @@ class Plates(object):
 
         meta_cols = ['ercc', 'alignment_not_unique', 'no_feature']
 
-        percent_ercc = well_map.sum()['ercc'].divide(total_reads, axis=0)
+        percent_ercc = well_map['ercc'].sum().divide(total_reads, axis=0)
         percent_mapped_reads = unique_reads / total_reads - percent_ercc
 
         plate_summaries = pd.DataFrame(OrderedDict([
             (Plates.MEAN_READS_PER_CELL, total_reads / well_map.size()),
-            (Plates.MEDIAN_GENES_PER_CELL, well_map.median()['n_genes']),
-            ('Percent not uniquely aligned', well_map.sum()['alignment_not_unique'].divide(total_reads, axis=0)),
+            (Plates.MEDIAN_GENES_PER_CELL, well_map['n_genes'].median()),
+            ('Percent not uniquely aligned',
+                well_map['alignment_not_unique'].sum().divide(total_reads, axis=0)),
             (Plates.PERCENT_MAPPED_READS, percent_mapped_reads),
-            ('Percent no feature', well_map.sum()['no_feature'].divide(total_reads, axis=0)),
+            ('Percent no feature', well_map['no_feature'].sum().divide(total_reads, axis=0)),
             ('Percent Rn45s', self.genes['Rn45s'].groupby(
                     self.cell_metadata['WELL_MAPPING']).sum() / total_reads),
             (Plates.PERCENT_ERCC, percent_ercc),
