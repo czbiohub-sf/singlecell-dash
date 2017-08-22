@@ -27,8 +27,11 @@ def maybe_to_numeric(series):
         return series
 
 
-def clean_mapping_stats(mapping_stats_original):
+def clean_mapping_stats(mapping_stats_original, convert_to_percentage=None):
     """Remove whitespace from all values and convert to numbers"""
+
+    if convert_to_percentage is None:
+        convert_to_percentage = set()
 
     mapping_stats_original = mapping_stats_original.applymap(
         lambda x: (x.replace(',', '').strip().strip('%')
@@ -38,7 +41,16 @@ def clean_mapping_stats(mapping_stats_original):
 
     numeric.columns = numeric.columns.map(str.strip)
 
+    # for 10X mapping stats
+    numeric.columns = numeric.columns.map(
+            lambda x: ('Percent {}'.format(x.replace('Fraction ', ''))
+                       if x in convert_to_percentage else x)
+    )
+
     return numeric
+
+
+
 
 
 def diff_exp(counts, group1, group2):
@@ -215,12 +227,12 @@ class Plates(object):
         plate_summaries = pd.DataFrame(OrderedDict([
             (Plates.MEAN_READS_PER_CELL, total_reads / well_map.size()),
             (Plates.MEDIAN_GENES_PER_CELL, well_map.median()['n_genes']),
-            ('Percent not uniquely aligned', well_map.sum()['alignment_not_unique'].divide(total_reads, axis=0)),
-            (Plates.PERCENT_MAPPED_READS, percent_mapped_reads),
-            ('Percent no feature', well_map.sum()['no_feature'].divide(total_reads, axis=0)),
-            ('Percent Rn45s', self.genes['Rn45s'].groupby(
+            ('Percent not uniquely aligned', 100 * well_map.sum()['alignment_not_unique'].divide(total_reads, axis=0)),
+            (Plates.PERCENT_MAPPED_READS, 100 * percent_mapped_reads),
+            ('Percent no feature', 100 * well_map.sum()['no_feature'].divide(total_reads, axis=0)),
+            ('Percent Rn45s', 100 * self.genes['Rn45s'].groupby(
                     self.cell_metadata[Plates.SAMPLE_MAPPING]).sum() / total_reads),
-            (Plates.PERCENT_ERCC, percent_ercc),
+            (Plates.PERCENT_ERCC, 100 * percent_ercc),
             ('n_wells', well_map.size())
         ]))
 
@@ -341,6 +353,17 @@ class TenX_Runs(Plates):
     MEDIAN_GENES_PER_CELL = 'Median genes per barcode'
 
     SAMPLE_MAPPING = 'CHANNEL_MAPPING'
+
+    COLUMNS_TO_CONVERT = {'Valid Barcodes',
+                          'Reads Mapped Confidently to Transcriptome',
+                          'Reads Mapped Confidently to Exonic Regions',
+                          'Reads Mapped Confidently to Intronic Regions',
+                          'Reads Mapped Confidently to Intergenic Regions',
+                          'Reads Mapped Antisense to Gene',
+                          'Sequencing Saturation',
+                          'Q30 Bases in Barcode', 'Q30 Bases in RNA Read',
+                          'Q30 Bases in Sample Index', 'Q30 Bases in UMI',
+                          'Fraction Reads in Cells'}
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
                  verbose=False):
@@ -467,7 +490,10 @@ class TenX_Runs(Plates):
         counts.sort_index(inplace=True)
         channel_ids = counts.index.get_level_values(0)
 
-        mapping_stats = clean_mapping_stats(mapping_stats)
+        mapping_stats = clean_mapping_stats(
+                mapping_stats,
+                convert_to_percentage=TenX_Runs.COLUMNS_TO_CONVERT
+        )
 
         sample_ids = pd.Series(
                 '{}_{}'.format(channel, index) for channel, index in
@@ -504,19 +530,19 @@ class TenX_Runs(Plates):
 
         total_reads = self.mapping_stats['Number of Reads']
 
-        percent_mapped_reads = self.mapping_stats[
-            'Reads Mapped Confidently to Transcriptome']
+        percent_rn45s = self.genes['Rn45s'].groupby(
+                self.cell_metadata[TenX_Runs.SAMPLE_MAPPING]
+        ).sum() / total_reads
 
         percent_ercc = channel_map['ercc'].sum().divide(total_reads, axis=0)
 
-        plate_summaries = pd.DataFrame(OrderedDict([
-            (TenX_Runs.MEAN_READS_PER_CELL, self.mapping_stats['Mean Reads per Cell']),
-            (TenX_Runs.MEDIAN_GENES_PER_CELL, self.mapping_stats['Median Genes per Cell']),
-            (TenX_Runs.PERCENT_MAPPED_READS, percent_mapped_reads),
-            ('Percent Rn45s', self.genes['Rn45s'].groupby(
-                    self.cell_metadata[TenX_Runs.SAMPLE_MAPPING]).sum() / total_reads),
-            (TenX_Runs.PERCENT_ERCC, percent_ercc),
-            ('n_barcodes', channel_map.size())
-        ]))
+        plate_summaries = pd.concat(
+                [self.mapping_stats,
+                 pd.DataFrame(OrderedDict([
+                     ('Percent Rn45s', percent_rn45s),
+                     (TenX_Runs.PERCENT_ERCC, percent_ercc),
+                     ('n_barcodes', channel_map.size())
+                 ]))], axis=1
+        )
 
         return plate_summaries

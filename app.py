@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 
-from common import diff_exp, Plates
+from common import diff_exp, Plates, TenX_Runs
 
 
 # Use commas to separate thousands
@@ -44,6 +44,9 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
     plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
                     verbose=verbose)
+
+    tenx_runs = TenX_Runs(data_folder, genes_to_drop=genes_to_drop,
+                          verbose=verbose)
 
     app = dash.Dash()
     if javascript is not None:
@@ -124,9 +127,9 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                 dcc.Graph(
                         id='plate_summary2',
                         figure={"data": [go.Scatter(
-                                x=100*plates.plate_summaries[
+                                x=plates.plate_summaries[
                                     plates.PERCENT_ERCC],
-                                y=100*plates.plate_summaries[
+                                y=plates.plate_summaries[
                                     plates.PERCENT_MAPPED_READS],
                                 mode='markers', hoverinfo='text',
                                 text=plates.plate_summaries.index)],
@@ -203,8 +206,10 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                        className='one columns offset-by-one'),
             dcc.Dropdown(
                     id='plate_name',
-                    options=[{'label': i, 'value': i} for i in
-                             plates.plate_summaries.index],
+                    options=[{'label': i, 'value': i} for ilist in
+                             (plates.plate_summaries.index,
+                              tenx_runs.plate_summaries.index)
+                             for i in ilist],
                     value=plates.plate_summaries.index[0],
                     className='four columns',
                     clearable=False
@@ -659,7 +664,7 @@ tracker below!
         elif isinstance(value, str):
             return value
         elif 'percent' in item.name.lower():
-            return '{:.2f}%'.format(value * 100.)
+            return '{:.2f}%'.format(value)
         elif isinstance(value, pd.Timestamp):
             return str(np.datetime64(value, 'D'))
         elif (isinstance(value, float)  # this must go before ints!
@@ -678,8 +683,12 @@ tracker below!
         dash.dependencies.Output('plate_stats_table', 'children'),
         [dash.dependencies.Input('plate_name', 'value')])
     def update_plate_stats_table(plate_name):
-        summary = plates.plate_summaries.loc[plate_name]
-        metadata = plates.plate_metadata.loc[plate_name]
+        if plate_name.startswith('10X'):
+            summary = tenx_runs.plate_summaries.loc[plate_name]
+            metadata = tenx_runs.plate_metadata.loc[plate_name]
+        else:
+            summary = plates.plate_summaries.loc[plate_name]
+            metadata = plates.plate_metadata.loc[plate_name]
 
         metadata = metadata.append(summary)
 
