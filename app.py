@@ -385,7 +385,7 @@ tracker below!
         """Callback when a plate is selected, update the reads v genes scatter plot
         """
 
-        plate_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
+        plate_barcodes = plates.cell_metadata.groupby(plates.SAMPLE_MAPPING).groups[
             plate_name]
         cell_metadata_subset = plates.cell_metadata.loc[plate_barcodes]
 
@@ -413,7 +413,7 @@ tracker below!
         alpha = pd.Series(1.0, index=smushed.index)
 
         if selected_gene:
-            plate_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
+            plate_barcodes = plates.cell_metadata.groupby(plates.SAMPLE_MAPPING).groups[
                 plate_name]
             log_gene_data = plates.counts_per_million.loc[plate_barcodes][
                 selected_gene].map(lambda x: np.log10(x + 1.0))
@@ -476,7 +476,7 @@ tracker below!
              dash.dependencies.Input('expression-type', 'value')])
     def update_diff_exp(plate_name, selectedDataQC=None,
                         selectedDataTSNE=None, expression_type=None):
-        all_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
+        all_barcodes = plates.cell_metadata.groupby(plates.SAMPLE_MAPPING).groups[
             plate_name]
 
         if selectedDataQC and selectedDataQC['points']:
@@ -574,7 +574,7 @@ tracker below!
                                     yaxis_column_name,
                                     xaxis_type, yaxis_type, selectedData=None):
         """Update the gene vs gene scatter plot"""
-        plate_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
+        plate_barcodes = plates.cell_metadata.groupby(plates.SAMPLE_MAPPING).groups[
             plate_name]
         genes_subset = plates.genes.loc[plate_barcodes]
         alpha = pd.Series(1.0, index=genes_subset.index)

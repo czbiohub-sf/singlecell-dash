@@ -31,7 +31,8 @@ def clean_mapping_stats(mapping_stats_original):
     """Remove whitespace from all values and convert to numbers"""
 
     mapping_stats_original = mapping_stats_original.applymap(
-        lambda x: x.strip().strip('%') if isinstance(x, str) else x)
+        lambda x: (x.replace(',', '').strip().strip('%')
+                   if isinstance(x, str) else x))
 
     numeric = mapping_stats_original.apply(maybe_to_numeric)
 
@@ -68,6 +69,9 @@ class Plates(object):
     MEDIAN_GENES_PER_CELL = 'Median genes per well'
     PERCENT_ERCC = 'Percent ERCC'
     PERCENT_MAPPED_READS = 'Percent mapped to genome'
+
+    # maybe we should change this to the right thing
+    SAMPLE_MAPPING = 'WELL_MAPPING'
 
     def __init__(self, data_folder, metadata, genes_to_drop='Rn45s',
                  verbose=False):
@@ -195,17 +199,15 @@ class Plates(object):
 
     def calculate_plate_summaries(self):
         """Get mean reads, percent mapping, etc summaries for each plate"""
-        well_map = self.cell_metadata.groupby('WELL_MAPPING')
+        well_map = self.cell_metadata.groupby(Plates.SAMPLE_MAPPING)
 
         # these stats are from STAR mapping
         star_cols = ['Number of input reads', 'Uniquely mapped reads number']
         star_stats = self.mapping_stats[star_cols].groupby(
-                self.cell_metadata['WELL_MAPPING']).sum()
+                self.cell_metadata[Plates.SAMPLE_MAPPING]).sum()
 
         total_reads = star_stats['Number of input reads']
         unique_reads = star_stats['Uniquely mapped reads number']
-
-        meta_cols = ['ercc', 'alignment_not_unique', 'no_feature']
 
         percent_ercc = well_map.sum()['ercc'].divide(total_reads, axis=0)
         percent_mapped_reads = unique_reads / total_reads - percent_ercc
@@ -217,7 +219,7 @@ class Plates(object):
             (Plates.PERCENT_MAPPED_READS, percent_mapped_reads),
             ('Percent no feature', well_map.sum()['no_feature'].divide(total_reads, axis=0)),
             ('Percent Rn45s', self.genes['Rn45s'].groupby(
-                    self.cell_metadata['WELL_MAPPING']).sum() / total_reads),
+                    self.cell_metadata[Plates.SAMPLE_MAPPING]).sum() / total_reads),
             (Plates.PERCENT_ERCC, percent_ercc),
             ('n_wells', well_map.size())
         ]))
@@ -273,7 +275,7 @@ class Plates(object):
     def compute_bulk_smushing(self):
         """Get average signal from each plate ('bulk') and find 2d embedding"""
 
-        grouped = self.genes.groupby(self.cell_metadata['WELL_MAPPING'])
+        grouped = self.genes.groupby(self.cell_metadata[self.SAMPLE_MAPPING])
 
         if os.path.exists(self.bulk_smushed_cache_file):
             smushed = pd.read_csv(self.bulk_smushed_cache_file, names=[0, 1],
@@ -294,7 +296,7 @@ class Plates(object):
 
     def compute_cell_smushing(self):
         """Within each plate, find a 2d embedding of all cells"""
-        grouped = self.genes.groupby(self.cell_metadata['WELL_MAPPING'])
+        grouped = self.genes.groupby(self.cell_metadata[self.SAMPLE_MAPPING])
 
         if os.path.exists(self.cell_smushed_cache_file):
             smusheds = pd.read_pickle(self.cell_smushed_cache_file)
@@ -330,3 +332,191 @@ class Plates(object):
         top_genes = in_top10.apply(
             lambda x: x.sort_values().dropna().index.tolist(), axis=1)
         return top_genes
+
+
+class TenX_Runs(Plates):
+
+    # Names of commonly accessed columns
+    MEAN_READS_PER_CELL = 'Mean reads per barcode'
+    MEDIAN_GENES_PER_CELL = 'Median genes per barcode'
+
+    SAMPLE_MAPPING = 'CHANNEL_MAPPING'
+
+    def __init__(self, data_folder, genes_to_drop='Rn45s',
+                 verbose=False):
+
+        run_folder = os.path.join(data_folder, '10x_data')
+
+        counts = self.combine_cell_files(run_folder, '*/10X_P*cell-gene.csv',
+            verbose=verbose)
+        mapping_stats = self.combine_metrics_files(
+                run_folder, '*/metrics_summary.csv')
+
+        # these files were hand-formatted to be consistent.
+        # TODO: auto-format 10x metadata
+        self.plate_metadata = combine_cell_files(run_folder,
+                                                 'MACA_10X_P*.csv',
+                                                 index_col=0)
+
+        self.genes, self.cell_metadata, self.mapping_stats = \
+            self.clean_and_reformat(counts, mapping_stats)
+
+        self.plate_summaries = self.calculate_plate_summaries()
+
+        self.plate_metadata = self.plate_metadata.loc[
+            self.plate_summaries.index]
+
+        if not os.path.exists(os.path.join(data_folder, 'coords')):
+            os.mkdir(os.path.join(data_folder, 'coords'))
+
+        self.bulk_smushed_cache_file = os.path.join(data_folder, 'coords',
+                                                    'bulk_10x_smushed.csv')
+        self.cell_smushed_cache_file = os.path.join(data_folder, 'coords',
+                                                    'cell_10x_smushed.pickle')
+
+        self.bulk_smushed = self.compute_bulk_smushing()
+        self.cell_smushed = self.compute_cell_smushing()
+
+        self.gene_names = sorted(self.genes.columns)
+        self.plate_metadata_features = sorted(self.plate_metadata.columns)
+
+        # Remove pesky genes
+        self.genes = self.genes.drop(genes_to_drop, axis=1)
+
+        # Get a counts per million rescaling of the genes
+        self.counts_per_million = self.genes.divide(self.genes.sum(axis=1),
+                                                    axis=0) * 1e6
+        self.top_genes = self.compute_top_genes_per_cell()
+
+        self.data = {'genes': self.genes,
+                     'mapping_stats': self.mapping_stats,
+                     'cell_metadata': self.cell_metadata,
+                     'plate_metadata': self.plate_metadata,
+                     'plate_summaries': self.plate_summaries}
+
+    def __repr__(self):
+        n_channels = self.plate_summaries.shape[0]
+        n_barcodes = self.genes.shape[0]
+        s = f'This is an object holding data for {n_channels} 10X channels and ' \
+            f'{n_barcodes} barcodes.\nHere are the accessible dataframes:\n'
+
+        for name, df in self.data.items():
+            s += f'\t"{name}" table dimensions: ' + str(df.shape) + '\n'
+        return s
+
+    @staticmethod
+    def combine_cell_files(folder, globber, verbose=False):
+        dfs = []
+
+        for filename in glob.iglob(os.path.join(folder, globber)):
+            if verbose:
+                print(f'Reading {filename} ...')
+
+            channel = os.path.basename(os.path.dirname(filename))
+
+            df = pd.read_csv(filename, index_col=0)
+            df.index = pd.MultiIndex.from_product(([channel], df.index),
+                                                  names=['channel', 'cell_id'])
+            dfs.append(df)
+        combined = pd.concat(dfs)
+        return combined
+
+    @staticmethod
+    def combine_metrics_files(folder, globber):
+        dfs = []
+
+        for filename in glob.iglob(os.path.join(folder, globber)):
+            p_name = os.path.basename(os.path.dirname(filename))
+            df = pd.read_csv(filename)
+            df[TenX_Runs.SAMPLE_MAPPING] = p_name
+            dfs.append(df)
+        combined = pd.concat(dfs)
+        combined.set_index(TenX_Runs.SAMPLE_MAPPING, inplace=True)
+        return combined
+
+    @staticmethod
+    def clean_and_reformat(counts, mapping_stats):
+        """Move metadata information into separate dataframe and simplify ids
+
+        Parameters
+        ----------
+        counts : pandas.DataFrame
+            A (samples, genes) dataframe of integer number of reads that mapped
+            to a gene in a cell, but also has extra columns of ERCC mapping and
+            htseq-count output that we want to remove
+        mapping_stats : pandas.DataFrame
+            A (samples, mapping_statistics) dataframe of the time the alignment
+            began, number of input reads, number of mapped reads, and other
+            information output by STAR, but everything is a string instead of
+            numbers which makes us sad
+
+        Returns
+        -------
+        genes : pandas.DataFrame
+            A (samples, genes) dataframe of integer number of reads that mapped
+            to a gene in a cell
+        cell_metadata : pandas.DataFrame
+            A (samples, sample_features) dataframe of number of detected genes,
+            total reads, ercc counts, and "WELL_MAPPING" (really,
+            plate mapping)
+        mapping_stats : pandas.DataFrame
+            A (samples, mapping_statistics) dataframe of the time the alignment
+            began, number of input reads, number of mapped reads, and other
+            information output by CellRanger, with numbers properly formatted
+        """
+        counts.sort_index(inplace=True)
+        channel_ids = counts.index.get_level_values(0)
+
+        mapping_stats = clean_mapping_stats(mapping_stats)
+
+        sample_ids = pd.Series(
+                '{}_{}'.format(channel, index) for channel, index in
+                counts.index
+        )
+
+        cell_metadata = pd.DataFrame(
+                index=sample_ids,
+                data={TenX_Runs.SAMPLE_MAPPING: channel_ids}
+        )
+
+        counts.index = sample_ids
+
+        # Separate spike-ins (ERCCs) and genes
+        ercc_names = [col for col in counts.columns if col.startswith('ERCC-')]
+        gene_names = [col for col in counts.columns if
+                      not (col.startswith('ERCC-')
+                           or col.endswith('_transgene'))]
+
+        # Separate counts of everything from genes-only
+        genes = counts[gene_names]
+
+        # Add mapping and ERCC counts to cell metadata
+        cell_metadata['total_reads'] = counts.sum(axis=1)
+        cell_metadata['n_genes'] = (genes > 0).sum(axis=1)
+        cell_metadata['mapped_reads'] = genes.sum(axis=1)
+        cell_metadata['ercc'] = counts[ercc_names].sum(axis=1)
+
+        return genes, cell_metadata, mapping_stats
+
+    def calculate_plate_summaries(self):
+        """Get mean reads, percent mapping, etc summaries for each plate"""
+        channel_map = self.cell_metadata.groupby(TenX_Runs.SAMPLE_MAPPING)
+
+        total_reads = self.mapping_stats['Number of Reads']
+
+        percent_mapped_reads = self.mapping_stats[
+            'Reads Mapped Confidently to Transcriptome']
+
+        percent_ercc = channel_map['ercc'].sum().divide(total_reads, axis=0)
+
+        plate_summaries = pd.DataFrame(OrderedDict([
+            (TenX_Runs.MEAN_READS_PER_CELL, self.mapping_stats['Mean Reads per Cell']),
+            (TenX_Runs.MEDIAN_GENES_PER_CELL, self.mapping_stats['Median Genes per Cell']),
+            (TenX_Runs.PERCENT_MAPPED_READS, percent_mapped_reads),
+            ('Percent Rn45s', self.genes['Rn45s'].groupby(
+                    self.cell_metadata[TenX_Runs.SAMPLE_MAPPING]).sum() / total_reads),
+            (TenX_Runs.PERCENT_ERCC, percent_ercc),
+            ('n_barcodes', channel_map.size())
+        ]))
+
+        return plate_summaries
