@@ -8,7 +8,9 @@ import scipy.stats as stats
 from collections import OrderedDict
 
 
-def combine_cell_files(folder, globber, verbose=False, **kwargs):
+def combine_csv_files(folder, globber, verbose=False, **kwargs):
+    """generic function for concatentating a bunch of csv files into a single
+    pandas Dataframe"""
     dfs = []
 
     for filename in glob.iglob(os.path.join(folder, globber)):
@@ -90,10 +92,10 @@ class Plates(object):
 
         plates_folder = os.path.join(data_folder, 'plates')
 
-        counts = combine_cell_files(
+        counts = combine_csv_files(
             plates_folder, '*.htseq-count-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose)
-        mapping_stats = combine_cell_files(
+        mapping_stats = combine_csv_files(
             plates_folder, '*.log-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose)
         self.genes, self.cell_metadata, self.mapping_stats = \
@@ -377,9 +379,9 @@ class TenX_Runs(Plates):
 
         # these files were hand-formatted to be consistent.
         # TODO: auto-format 10x metadata
-        self.plate_metadata = combine_cell_files(run_folder,
+        self.plate_metadata = combine_csv_files(run_folder,
                                                  'MACA_10X_P*.csv',
-                                                 index_col=0)
+                                                index_col=0)
 
         self.genes, self.cell_metadata, self.mapping_stats = \
             self.clean_and_reformat(counts, mapping_stats)
