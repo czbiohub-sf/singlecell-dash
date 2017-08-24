@@ -351,8 +351,9 @@ class Plates(object):
 class TenX_Runs(Plates):
 
     # Names of commonly accessed columns
-    MEAN_READS_PER_CELL = 'Mean reads per barcode'
-    MEDIAN_GENES_PER_CELL = 'Median genes per barcode'
+    MEAN_READS_PER_CELL = 'Mean Reads per Cell'
+    MEDIAN_GENES_PER_CELL = 'Median Genes per Cell'
+    PERCENT_MAPPED_READS = 'Percent Reads Mapped Confidently to Transcriptome'
 
     SAMPLE_MAPPING = 'CHANNEL_MAPPING'
 
