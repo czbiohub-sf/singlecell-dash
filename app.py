@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 
-from common import diff_exp, Plates
+from common import diff_exp, Plates, TenX_Runs
 
 
 # Use commas to separate thousands
@@ -44,6 +44,9 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
     plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
                     verbose=verbose)
+
+    tenx_runs = TenX_Runs(data_folder, genes_to_drop=genes_to_drop,
+                          verbose=verbose)
 
     app = dash.Dash()
     if javascript is not None:
@@ -92,28 +95,26 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
         html.H2('QC of all plates', className='row',
                 style={'padding-top': '20px'}),
 
+        html.Div([
+            html.Div([
+                dcc.RadioItems(
+                        id='dataset-type',
+                        options=[{'label': i, 'value': i} for i in
+                                 ['Plates', '10X Runs']],
+                        value='Plates',
+                        labelStyle={'display': 'inline-block'}
+                )
+            ],
+                    className='four columns offset-by-one'
+            )
+        ],
+                className='row'
+        ),
+
         html.Div([  # all plates section
             html.Div([  # mean genes vs mean reads
                 dcc.Graph(
-                        id='plate_summary1',
-                        figure={
-                            "data"  : [go.Scatter(
-                                    x=plates.plate_summaries[
-                                        plates.MEAN_READS_PER_CELL],
-                                    y=plates.plate_summaries[
-                                        plates.MEDIAN_GENES_PER_CELL],
-                                    mode='markers',
-                                    hoverinfo='text',
-                                    text=plates.plate_summaries.index)],
-                            "layout": go.Layout(
-                                    title="Plate reads and genes",
-                                    xaxis={
-                                        'title': 'Mean reads per cell'},
-                                    yaxis={
-                                        'title': "Median genes per cell"},
-                                    hovermode='closest'
-                            ),
-                        },
+                        id='reads-vs-genes',
                         config=config_dict.copy()
                 )
             ],
@@ -122,23 +123,7 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
 
             html.Div([  # percent ERCC
                 dcc.Graph(
-                        id='plate_summary2',
-                        figure={"data": [go.Scatter(
-                                x=100*plates.plate_summaries[
-                                    plates.PERCENT_ERCC],
-                                y=100*plates.plate_summaries[
-                                    plates.PERCENT_MAPPED_READS],
-                                mode='markers', hoverinfo='text',
-                                text=plates.plate_summaries.index)],
-                            "layout"  : go.Layout(
-                                    title="Plate ERCC and mapped reads",
-                                    xaxis={
-                                        'title': 'Percent ERCC'},
-                                    yaxis={
-                                        'title': "Percent mapped reads"},
-                                    hovermode='closest'
-                            ),
-                        },
+                        id='reads-vs-ercc',
                         config=config_dict.copy()
                 )
             ],
@@ -159,9 +144,6 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                                className='two columns offset-by-one'),
                     dcc.Dropdown(
                             id='plate_metadata_feature',
-                            options=[{'label': i, 'value': i} for i in
-                                     plates.plate_metadata_features],
-                            value='tissue_subtissue',
                             className='six columns'
                     ),
                 ],
@@ -169,21 +151,7 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                 ),
                 # all-plates TSNE
                 dcc.Graph(
-                        id='tsne_all_plates', figure={
-                            "data"  : [go.Scatter(x=plates.bulk_smushed[0],
-                                                  y=plates.bulk_smushed[1],
-                                                  mode='markers',
-                                                  hoverinfo='text',
-                                                  text=plates.plate_summaries.index)],
-                            "layout": go.Layout(
-                                    title="Plate TSNE (in silico 'bulk' gene expression)",
-                                    xaxis={'title'         : 'TSNE 1',
-                                           'showticklabels': False},
-                                    yaxis={'title'         : "TSNE 2",
-                                           'showticklabels': False},
-                                    hovermode='closest'
-                            ),
-                        },
+                        id='tsne_all_plates',
                         config=config_dict.copy()
                 )
             ],
@@ -203,8 +171,10 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                        className='one columns offset-by-one'),
             dcc.Dropdown(
                     id='plate_name',
-                    options=[{'label': i, 'value': i} for i in
-                             plates.plate_summaries.index],
+                    options=[{'label': i, 'value': i} for ilist in
+                             (plates.plate_summaries.index,
+                              tenx_runs.plate_summaries.index)
+                             for i in ilist],
                     value=plates.plate_summaries.index[0],
                     className='four columns',
                     clearable=False
@@ -378,16 +348,146 @@ tracker below!
             className='ten columns offset-by-one'
     )
 
+
+
+
+
+    @app.callback(
+            dash.dependencies.Output('reads-vs-genes', 'figure'),
+            [dash.dependencies.Input('dataset-type', 'value')]
+    )
+    def upgrade_reads_vs_genes(dataset_type):
+        """Update the reads vs genes plot according to dataset"""
+
+        dataset = {'Plates': plates, '10X Runs': tenx_runs}[dataset_type]
+
+        return {
+            "data"  : [
+                go.Scatter(
+                        x=dataset.plate_summaries[
+                            dataset.MEAN_READS_PER_CELL],
+                        y=dataset.plate_summaries[
+                            dataset.MEDIAN_GENES_PER_CELL],
+                        mode='markers',
+                        hoverinfo='text',
+                        text=dataset.plate_summaries.index)
+            ],
+            "layout": go.Layout(
+                    title="Plate reads and genes",
+                    xaxis={
+                        'title': dataset.MEAN_READS_PER_CELL},
+                    yaxis={
+                        'title': dataset.MEDIAN_GENES_PER_CELL},
+                    hovermode='closest'
+            ),
+        }
+
+
+    @app.callback(
+            dash.dependencies.Output('reads-vs-ercc', 'figure'),
+            [dash.dependencies.Input('dataset-type', 'value')]
+    )
+    def update_reads_vs_ercc_plot(dataset_type):
+        """Update the reads vs ERCC plot according to dataset"""
+
+        dataset = {'Plates': plates, '10X Runs': tenx_runs}[dataset_type]
+
+        return {
+            "data"  : [
+                go.Scatter(
+                        x=dataset.plate_summaries[
+                            dataset.PERCENT_ERCC],
+                        y=dataset.plate_summaries[
+                            dataset.PERCENT_MAPPED_READS],
+                        mode='markers', hoverinfo='text',
+                        text=dataset.plate_summaries.index)
+            ],
+            "layout": go.Layout(
+                    title="Plate ERCC and mapped reads",
+                    xaxis={
+                        'title': dataset.PERCENT_ERCC},
+                    yaxis={
+                        'title': dataset.PERCENT_MAPPED_READS},
+                    hovermode='closest'
+            ),
+        }
+
+
+
+    @app.callback(
+            dash.dependencies.Output('plate_metadata_feature', 'options'),
+            [dash.dependencies.Input('dataset-type', 'value')]
+    )
+    def tsne_all_plate_features(dataset_type):
+        """Update the all-plate TSNE feature choices according to dataset"""
+
+        dataset = {'Plates': plates, '10X Runs': tenx_runs}[dataset_type]
+
+        return [{'label': i, 'value': i} for i in
+                dataset.plate_metadata_features]
+
+
+    @app.callback(
+            dash.dependencies.Output('plate_metadata_feature', 'value'),
+            [dash.dependencies.Input('dataset-type', 'value')]
+    )
+    def tsne_feature_choice(dataset_type):
+        """Update the all-plate TSNE feature default according to dataset"""
+
+        return {'Plates': 'tissue_subtissue',
+                '10X Runs': 'Tissue'}[dataset_type]
+
+
+    @app.callback(
+            dash.dependencies.Output('tsne_all_plates', 'figure'),
+            [dash.dependencies.Input('plate_metadata_feature', 'value'),
+             dash.dependencies.Input('dataset-type', 'value')]
+    )
+    def color_tsne_all_plates(plate_metadata_feature, dataset_type):
+        """Update the all-plate TSNE plot when a new feature is selected"""
+
+        dataset = {'Plates': plates, '10X Runs': tenx_runs}[dataset_type]
+
+        feature = dataset.plate_metadata[plate_metadata_feature]
+
+        scatters = []
+
+        for name, df in dataset.bulk_smushed.groupby(feature):
+            scatter = go.Scatter(x=df[0],
+                                 y=df[1],
+                                 mode='markers',
+                                 name=name,
+                                 hoverinfo='text',
+                                 text=df.index)
+            scatters.append(scatter)
+
+        return {
+            "data"  : scatters,
+            "layout": go.Layout(
+                    title="Plate TSNE (in silico 'bulk' gene expression)",
+                    xaxis={'title'         : 'TSNE 1',
+                           'showticklabels': False},
+                    yaxis={'title'         : "TSNE 2",
+                           'showticklabels': False},
+                    hovermode='closest',
+                    showlegend=True)
+        }
+
+
     @app.callback(
             dash.dependencies.Output('single_plate_reads_vs_genes', 'figure'),
             [dash.dependencies.Input('plate_name', 'value')])
     def update_single_plate_reads_vs_genes(plate_name):
         """Callback when a plate is selected, update the reads v genes scatter plot
         """
+        if plate_name.startswith('10X'):
+            dataset = tenx_runs
+        else:
+            dataset = plates
 
-        plate_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
+        plate_barcodes = dataset.cell_metadata.groupby(dataset.SAMPLE_MAPPING).groups[
             plate_name]
-        cell_metadata_subset = plates.cell_metadata.loc[plate_barcodes]
+        cell_metadata_subset = dataset.cell_metadata.loc[plate_barcodes]
 
         return {
             "data"  : [go.Scatter(x=cell_metadata_subset['total_reads'],
@@ -409,13 +509,18 @@ tracker below!
                                      'selectedData'),
              dash.dependencies.Input('selected_gene', 'value')])
     def update_cell_tsne(plate_name, selectedData=None, selected_gene=None):
-        smushed = plates.cell_smushed[plate_name]
+        if plate_name.startswith('10X'):
+            dataset = tenx_runs
+        else:
+            dataset = plates
+
+        smushed = dataset.cell_smushed[plate_name]
         alpha = pd.Series(1.0, index=smushed.index)
 
         if selected_gene:
-            plate_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
+            plate_barcodes = dataset.cell_metadata.groupby(dataset.SAMPLE_MAPPING).groups[
                 plate_name]
-            log_gene_data = plates.counts_per_million.loc[plate_barcodes][
+            log_gene_data = dataset.counts_per_million.loc[plate_barcodes][
                 selected_gene].map(lambda x: np.log10(x + 1.0))
             hovertext = log_gene_data.to_frame().apply(
                     lambda x: '{}: {:.1f}'.format(x.name, x[0]), 1
@@ -426,7 +531,7 @@ tracker below!
             hovertext = hovertext.map(
                 lambda x: '{}<br>Top genes:<br>'.format(x)
                           + '<br>'.join(['{}. {}'.format(i+1, gene) for i, gene
-                                         in enumerate(plates.top_genes[x])]))
+                                         in enumerate(dataset.top_genes[x])]))
 
         if selectedData and selectedData['points']:
             barcodes = {d['customdata'] for d in selectedData['points']}
@@ -476,13 +581,18 @@ tracker below!
              dash.dependencies.Input('expression-type', 'value')])
     def update_diff_exp(plate_name, selectedDataQC=None,
                         selectedDataTSNE=None, expression_type=None):
-        all_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
+        if plate_name.startswith('10X'):
+            dataset = tenx_runs
+        else:
+            dataset = plates
+
+        all_barcodes = dataset.cell_metadata.groupby(dataset.SAMPLE_MAPPING).groups[
             plate_name]
 
         if selectedDataQC and selectedDataQC['points']:
             all_barcodes = [d['customdata'] for d in selectedDataQC['points']]
 
-        log_counts = np.log10(plates.counts_per_million.loc[all_barcodes] + 1.0)
+        log_counts = np.log10(dataset.counts_per_million.loc[all_barcodes] + 1.0)
 
         if selectedDataTSNE and selectedDataTSNE['points']:
             selected_barcodes = {d['customdata'] for d in
@@ -574,9 +684,16 @@ tracker below!
                                     yaxis_column_name,
                                     xaxis_type, yaxis_type, selectedData=None):
         """Update the gene vs gene scatter plot"""
-        plate_barcodes = plates.cell_metadata.groupby('WELL_MAPPING').groups[
-            plate_name]
-        genes_subset = plates.genes.loc[plate_barcodes]
+        if plate_name.startswith('10X'):
+            dataset = tenx_runs
+        else:
+            dataset = plates
+
+        plate_barcodes = dataset.cell_metadata.groupby(
+                dataset.SAMPLE_MAPPING).groups[plate_name]
+        genes_subset = dataset.genes.loc[plate_barcodes]
+
+
         alpha = pd.Series(1.0, index=genes_subset.index)
         hovertext = genes_subset[[xaxis_column_name, yaxis_column_name]].apply(
                 lambda x: '{}: {}, {}'.format(x.name, x[0], x[1]), 1
@@ -612,38 +729,6 @@ tracker below!
                     hovermode='closest')
         }
 
-
-    @app.callback(
-            dash.dependencies.Output('tsne_all_plates', 'figure'),
-            [dash.dependencies.Input('plate_metadata_feature', 'value')]
-    )
-    def color_tsne_all_plates(plate_metadata_feature):
-        """Update the all-plate TSNE plot when a new feature is selected"""
-        feature = plates.plate_metadata[plate_metadata_feature]
-
-        scatters = []
-
-        for name, df in plates.bulk_smushed.groupby(feature):
-            scatter = go.Scatter(x=df[0],
-                                 y=df[1],
-                                 mode='markers',
-                                 name=name,
-                                 hoverinfo='text',
-                                 text=df.index)
-            scatters.append(scatter)
-
-        return {
-            "data"  : scatters,
-            "layout": go.Layout(
-                    title="Plate TSNE (in silico 'bulk' gene expression)",
-                    xaxis={'title'         : 'TSNE 1',
-                           'showticklabels': False},
-                    yaxis={'title'         : "TSNE 2",
-                           'showticklabels': False},
-                    hovermode='closest',
-                    showlegend=True)
-        }
-
     def maybe_format(item):
         """Pretty-format a string, integer, float, or percent
 
@@ -659,7 +744,7 @@ tracker below!
         elif isinstance(value, str):
             return value
         elif 'percent' in item.name.lower():
-            return '{:.2f}%'.format(value * 100.)
+            return '{:.2f}%'.format(value)
         elif isinstance(value, pd.Timestamp):
             return str(np.datetime64(value, 'D'))
         elif (isinstance(value, float)  # this must go before ints!
@@ -678,8 +763,13 @@ tracker below!
         dash.dependencies.Output('plate_stats_table', 'children'),
         [dash.dependencies.Input('plate_name', 'value')])
     def update_plate_stats_table(plate_name):
-        summary = plates.plate_summaries.loc[plate_name]
-        metadata = plates.plate_metadata.loc[plate_name]
+        if plate_name.startswith('10X'):
+            dataset = tenx_runs
+        else:
+            dataset = plates
+
+        summary = dataset.plate_summaries.loc[plate_name]
+        metadata = dataset.plate_metadata.loc[plate_name]
 
         metadata = metadata.append(summary)
 
