@@ -92,7 +92,7 @@ class Plates(object):
 
         counts = combine_cell_files(
             plates_folder, '*.htseq-count-by-cell.csv',
-            index_col=[0, 1, 2, 3], verbose=verbose)
+            index_col=[0, 1, 2, 3], verbose=verbose, nrows=nrows)
         mapping_stats = combine_cell_files(
             plates_folder, '*.log-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose)
@@ -366,7 +366,7 @@ class TenX_Runs(Plates):
                           'Fraction Reads in Cells'}
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
-                 verbose=False):
+                 verbose=False, nrows=None):
 
         run_folder = os.path.join(data_folder, '10x_data')
 
@@ -379,7 +379,7 @@ class TenX_Runs(Plates):
         # TODO: auto-format 10x metadata
         self.plate_metadata = combine_cell_files(run_folder,
                                                  'MACA_10X_P*.csv',
-                                                 index_col=0)
+                                                 index_col=0, nrows=nrows)
 
         self.genes, self.cell_metadata, self.mapping_stats = \
             self.clean_and_reformat(counts, mapping_stats)
