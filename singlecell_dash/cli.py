@@ -1,5 +1,8 @@
 import click
 
+from singlecell_dash.common import TenX_Runs
+from singlecell_dash.app import run_singlecell_dash
+
 
 @click.command()
 @click.option('--data-folder', default='data', help='Location of data files')
@@ -26,13 +29,15 @@ import click
 def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
         debug):
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
-    plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
-                    verbose=verbose)
+    # plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
+    #                 verbose=verbose)
 
     tenx_runs = TenX_Runs(data_folder, genes_to_drop=genes_to_drop,
                           verbose=verbose)
 
-    app = SingleCellDash(embedding, cell_metadata, counts)
+    app = run_singlecell_dash(tenx_runs.cell_metadata,
+                              tenx_runs.counts_per_million,
+                              tenx_runs.SAMPLE_MAPPING)
 
     # this is where the magic happens
     app.run_server(host=host, debug=debug, port=port)
