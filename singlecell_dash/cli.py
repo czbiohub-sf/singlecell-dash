@@ -39,6 +39,8 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
                               tenx_runs.counts_per_million,
                               tenx_runs.SAMPLE_MAPPING)
 
+
+    # app = run_singlecell_dash()
     # this is where the magic happens
     app.run_server(host=host, debug=debug, port=port)
 
