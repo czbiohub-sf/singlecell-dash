@@ -92,7 +92,7 @@ class Plates(object):
         counts = combine_csv_files(
             plates_folder, '*.htseq-count-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose, nrows=nrows)
-        mapping_stats = combine_cell_files(
+        mapping_stats = combine_csv_files(
             plates_folder, '*.log-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose)
         self.genes, self.cell_metadata, self.mapping_stats = \
