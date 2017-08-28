@@ -46,6 +46,8 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
     # If in debug mode, only get the first 100 rows of the 10x data
     if debug:
         nrows = 100
+    else:
+        nrows = None
 
     plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
                     verbose=verbose)
