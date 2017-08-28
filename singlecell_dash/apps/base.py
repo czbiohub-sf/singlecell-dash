@@ -1,5 +1,5 @@
 """Building blocks for writing modular callbacks for plotly"""
-
+import dash_html_components as html
 
 CONFIG_DICT = {'modeBarButtonsToRemove': ['sendDataToCloud',
                                           'pan2d',
@@ -9,8 +9,7 @@ CONFIG_DICT = {'modeBarButtonsToRemove': ['sendDataToCloud',
                                           'resetScale2d',
                                           'hoverCompareCartesian',
                                           'hoverClosestCartesian',
-                                          'toggleSpikelines',
-                                          ],
+                                          'toggleSpikelines'],
                'displaylogo': False
                }
 
@@ -24,3 +23,7 @@ class BaseBlock:
 
         if self.app is not None and hasattr(self, 'callbacks'):
             self.callbacks(self.app)
+
+    @property
+    def layout(self):
+        return html.Div()

@@ -6,12 +6,13 @@ import pandas as pd
 import plotly.graph_objs as go
 
 from .base import BaseBlock, CONFIG_DICT
-from .subset import SubsetGroup
+from .dropdown_subset import SubsetGroup
+from .umis_vs_genes import UMIsVsGenesGate
 
 AXIS_TYPES = 'Linear', 'Log'
 
 
-class Scatter(BaseBlock):
+class GeneVsGene(BaseBlock):
     ID = 'gene_vs_gene_plot'
 
     def __init__(self, app, cell_metadata, counts, group_col,
@@ -85,11 +86,12 @@ class Scatter(BaseBlock):
              Input('yaxis-column', 'value'),
              Input('xaxis-type', 'value'),
              Input('yaxis-type', 'value'),
-             Input(SubsetGroup.ID, 'value')
+             Input(SubsetGroup.ID, 'value'),
+             Input(UMIsVsGenesGate.ID, 'selectedData')
              ])
         def update_gene_vs_gene_scatter(xaxis_col, yaxis_col,
                                         xaxis_type, yaxis_type,
-                                        group_name):
+                                        group_name, selectedData):
             """Update the gene vs gene scatter plot"""
 
             group_barcodes = self.metadata_grouped.groups[group_name]
@@ -97,8 +99,12 @@ class Scatter(BaseBlock):
             group_counts = self.counts.loc[group_barcodes]
             alpha = pd.Series(1.0, index=group_counts.index)
             hovertext = group_counts[[xaxis_col, yaxis_col]].apply(
-                lambda x: '{}: {}, {}'.format(x.name, x[0], x[1]), 1
-            )
+                lambda x: '{}: {}, {}'.format(x.name, x[0], x[1]), 1)
+
+            if selectedData and selectedData['points']:
+                barcodes = {d['customdata'] for d in selectedData['points']}
+                alpha.loc[~alpha.index.isin(barcodes)] = 0.1
+                hovertext[~hovertext.index.isin(barcodes)] = ''
 
             return {
                 'data': [

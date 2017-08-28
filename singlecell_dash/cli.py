@@ -35,10 +35,11 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
     tenx_runs = TenX_Runs(data_folder, genes_to_drop=genes_to_drop,
                           verbose=verbose)
 
-    app = run_singlecell_dash(tenx_runs.cell_metadata,
-                              tenx_runs.counts_per_million,
-                              tenx_runs.SAMPLE_MAPPING)
-
+    app = run_singlecell_dash(cell_metadata=tenx_runs.cell_metadata,
+                              counts=tenx_runs.counts_per_million,
+                              group_col=tenx_runs.SAMPLE_MAPPING,
+                              smushed=tenx_runs.cell_smushed,
+                              top_genes=tenx_runs.top_genes)
 
     # app = run_singlecell_dash()
     # this is where the magic happens

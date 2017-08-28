@@ -1,4 +1,4 @@
-
+"""Dropdown selector for a particular group"""
 from dash.dependencies import Output, Input
 import dash_html_components as html
 import dash_core_components as dcc
