@@ -381,7 +381,7 @@ class TenX_Runs(Plates):
         # these files were hand-formatted to be consistent.
         # TODO: auto-format 10x metadata
         self.plate_metadata = combine_csv_files(run_folder,
-                                                 'MACA_10X_P*.csv',
+                                                'MACA_10X_P*.csv',
                                                 index_col=0, nrows=nrows)
 
         self.genes, self.cell_metadata, self.mapping_stats = \
