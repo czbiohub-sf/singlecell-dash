@@ -52,9 +52,6 @@ def clean_mapping_stats(mapping_stats_original, convert_to_percentage=None):
     return numeric
 
 
-
-
-
 def diff_exp(counts, group1, group2):
     """Computes differential expression between group 1 and group 2
     for each column in the dataframe counts.
@@ -88,13 +85,13 @@ class Plates(object):
     SAMPLE_MAPPING = 'WELL_MAPPING'
 
     def __init__(self, data_folder, metadata, genes_to_drop='Rn45s',
-                 verbose=False):
+                 verbose=False, nrows=None):
 
         plates_folder = os.path.join(data_folder, 'plates')
 
         counts = combine_csv_files(
             plates_folder, '*.htseq-count-by-cell.csv',
-            index_col=[0, 1, 2, 3], verbose=verbose)
+            index_col=[0, 1, 2, 3], verbose=verbose, nrows=nrows)
         mapping_stats = combine_csv_files(
             plates_folder, '*.log-by-cell.csv',
             index_col=[0, 1, 2, 3], verbose=verbose)
@@ -369,7 +366,7 @@ class TenX_Runs(Plates):
                           'Fraction Reads in Cells'}
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
-                 verbose=False):
+                 verbose=False, nrows=None):
 
         run_folder = os.path.join(data_folder, '10x_data')
 
@@ -381,8 +378,8 @@ class TenX_Runs(Plates):
         # these files were hand-formatted to be consistent.
         # TODO: auto-format 10x metadata
         self.plate_metadata = combine_csv_files(run_folder,
-                                                 'MACA_10X_P*.csv',
-                                                index_col=0)
+                                                'MACA_10X_P*.csv',
+                                                index_col=0, nrows=nrows)
 
         self.genes, self.cell_metadata, self.mapping_stats = \
             self.clean_and_reformat(counts, mapping_stats)

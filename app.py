@@ -42,11 +42,18 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
         debug):
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
+
+    # If in debug mode, only get the first 100 rows of the 10x data
+    if debug:
+        nrows = 100
+    else:
+        nrows = None
+
     plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
                     verbose=verbose)
 
     tenx_runs = TenX_Runs(data_folder, genes_to_drop=genes_to_drop,
-                          verbose=verbose)
+                          verbose=verbose, nrows=nrows)
 
     app = dash.Dash()
     if javascript is not None:
