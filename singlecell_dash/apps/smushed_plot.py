@@ -117,3 +117,24 @@ class SmushedPlot(BaseBlock):
                     yaxis={'title': "TSNE 2", 'showticklabels': False},
                     hovermode='closest', dragmode='select'),
             }
+
+        def plot_labelprop(coords, communities):
+            scatters = []
+            for name, df in coords.groupby(communities):
+                scatter = go.Scatter(x=df[0],
+                                     y=df[1],
+                                     mode='markers',
+                                     name=name,
+                                     hoverinfo='text',
+                                     text=df.index)
+                scatters.append(scatter)
+
+            fig = {
+                'data': scatters,
+                "layout": go.Layout(title='Graph layout of cell type clusters',
+                                    xaxis={'showticklabels': False},
+                                    yaxis={'showticklabels': False},
+                                    hovermode='closest', dragmode='select')
+            }
+
+            plotly.offline.iplot(fig)
