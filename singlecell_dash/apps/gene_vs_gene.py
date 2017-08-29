@@ -121,5 +121,5 @@ class GeneVsGene(BaseBlock):
                            'type': yaxis_type.lower(),
                            'scaleanchor': 'x'},
                     margin={'l': 40, 'b': 40, 't': 10, 'r': 0},
-                    hovermode='closest')
+                    hovermode='closest', dragmode='select')
             }

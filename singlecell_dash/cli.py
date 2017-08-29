@@ -20,14 +20,17 @@ from singlecell_dash.app import run_singlecell_dash
                              "hosted (i.e. global or local host). Default is "
                              "None (localhost). Change to '0.0.0.0' for "
                              "global host", default=None)
+@click.option('--dropdown-col', default='Tissue',
+              help='Column in metadata to use for creating dropdown menu to '
+                   'subset data for viewing')
 @click.option('--javascript',
               help="Location of an arbitrary javacsript file you want to add"
                    " to the Dash app", default=None)
 @click.option('--debug', help="Run the Dash server in debug mode",
               is_flag=True)
 @click.version_option(version='v0.1.0')
-def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
-        debug):
+def cli(data_folder, metadata, genes_to_drop, verbose, port, host,
+        dropdown_col, javascript, debug):
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
     # plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
     #                 verbose=verbose)
@@ -37,7 +40,7 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host, javascript,
 
     app = run_singlecell_dash(cell_metadata=tenx_runs.cell_metadata,
                               counts=tenx_runs.counts_per_million,
-                              group_col=tenx_runs.SAMPLE_MAPPING,
+                              dropdown_col=dropdown_col,
                               smushed=tenx_runs.cell_smushed,
                               top_genes=tenx_runs.top_genes)
 

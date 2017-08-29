@@ -50,8 +50,12 @@ class UMIsVsGenesGate(BaseBlock):
 
         @app.callback(
             Output(self.ID, 'figure'),
-            [Input(SubsetGroup.ID, 'value')])
-        def update_reads_vs_genes(group_name):
+            [Input(SubsetGroup.ID, 'value'),
+             # Input(SmushedPlot.SELECTED_GENE_ID, 'value'),
+             # Input(SmushedPlot.SELECTED_METADATA_ID, 'value')
+             ])
+        def update_reads_vs_genes(group_name, selected_gene=None,
+                                  selected_metadata=None):
             """When a group is selected, update the reads v genes scatter"""
 
             group_barcodes = self.metadata_grouped.groups[group_name]

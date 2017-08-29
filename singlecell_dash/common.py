@@ -353,6 +353,7 @@ class TenX_Runs(Plates):
     MEDIAN_GENES_PER_CELL = 'Median genes per barcode'
 
     SAMPLE_MAPPING = 'CHANNEL_MAPPING'
+    TISSUE = 'Tissue'
 
     COLUMNS_TO_CONVERT = {'Valid Barcodes',
                           'Reads Mapped Confidently to Transcriptome',
@@ -388,6 +389,9 @@ class TenX_Runs(Plates):
 
         self.plate_metadata = self.plate_metadata.loc[
             self.plate_summaries.index]
+
+        self.cell_metadata = self.cell_metadata.join(self.plate_metadata,
+                                                     on=self.SAMPLE_MAPPING)
 
         if not os.path.exists(os.path.join(data_folder, 'coords')):
             os.mkdir(os.path.join(data_folder, 'coords'))
@@ -546,3 +550,27 @@ class TenX_Runs(Plates):
         )
 
         return plate_summaries
+
+    def compute_cell_smushing(self):
+        """Within each plate, find a 2d embedding of all cells"""
+        grouped = self.genes.groupby(self.cell_metadata[self.TISSUE])
+
+        if os.path.exists(self.cell_smushed_cache_file):
+            smusheds = pd.read_pickle(self.cell_smushed_cache_file)
+            # if nothing is missing, return the cached version
+            if not set(grouped.groups) - set(smusheds):
+                return smusheds
+        else:
+            smusheds = {}
+
+        for plate_name, genes_subset in grouped:
+            if plate_name not in smusheds:
+                cell_smusher = TSNE(metric='cosine', random_state=0)
+                cell_smushed = pd.DataFrame(
+                    cell_smusher.fit_transform(genes_subset),
+                    index=genes_subset.index)
+                smusheds[plate_name] = cell_smushed
+
+        pd.to_pickle(smusheds, self.cell_smushed_cache_file)
+
+        return smusheds

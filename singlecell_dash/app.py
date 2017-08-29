@@ -18,7 +18,7 @@ from .apps.umis_vs_genes import UMIsVsGenesGate
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 
-def run_singlecell_dash(cell_metadata, counts, group_col, smushed,
+def run_singlecell_dash(cell_metadata, counts, dropdown_col, smushed,
                         top_genes, javascript=None):
     # def run_singlecell_dash(javascript=None):
     app = dash.Dash()
@@ -36,14 +36,15 @@ def run_singlecell_dash(cell_metadata, counts, group_col, smushed,
 
     # creating a new MyBlock will register all callbacks
     # gene_vs_gene = GeneVsGene(app, cell_metadata, counts, group_col)
-    subset = SubsetGroup(app, cell_metadata[group_col].unique())
-    smushed = SmushedPlot(app, cell_metadata, group_col, smushed, counts,
+    subset = SubsetGroup(app, cell_metadata[dropdown_col].unique(),
+                         name=dropdown_col)
+    smushed = SmushedPlot(app, cell_metadata, dropdown_col, smushed, counts,
                           top_genes)
-    diff_expr = DifferentialExpression(app, cell_metadata, group_col, counts)
-    gate = UMIsVsGenesGate(app, cell_metadata, group_col)
-    scatter = GeneVsGene(app, cell_metadata, counts, group_col)
+    diff_expr = DifferentialExpression(app, cell_metadata, dropdown_col,
+                                       counts)
+    gate = UMIsVsGenesGate(app, cell_metadata, dropdown_col)
+    scatter = GeneVsGene(app, cell_metadata, counts, dropdown_col)
 
-    import pdb; pdb.set_trace()
     # now insert this component into the app's layout
     app.layout = html.Div([html.H1('Single Cell Dashboard App'),
                            subset.layout,

@@ -33,3 +33,22 @@ class SubsetGroup(BaseBlock):
         ],
             className='row'
         )
+
+
+class SubsetBase(BaseBlock):
+    """Class to inherit from for using the subsetted group name"""
+
+    SUBSET_ID = SubsetGroup.ID
+
+    def __init__(self, app, cell_metadata, dropdown_col):
+        self.cell_metadata = cell_metadata
+        self.dropdown_col = dropdown_col
+
+        self.metadata_grouped = self.cell_metadata.groupby(self.dropdown_col)
+
+        super().__init__(app)
+
+    def _get_dropdown_barcodes(self, group_name):
+        """Given the name of a group, get the cells/barcodes of that group"""
+        # TODO: add logic to deal with the special case of "All" samples
+        return self.metadata_grouped.groups[group_name]

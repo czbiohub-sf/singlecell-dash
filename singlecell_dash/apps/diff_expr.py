@@ -8,28 +8,29 @@ import plotly.graph_objs as go
 
 from ..common import diff_exp
 from .base import BaseBlock, CONFIG_DICT
-from .dropdown_subset import SubsetGroup
+from .dropdown_subset import SubsetBase
 from .smushed_plot import SmushedPlot
 from .umis_vs_genes import UMIsVsGenesGate
 
 
-class DifferentialExpression(BaseBlock):
+class DifferentialExpression(SubsetBase):
     ID = 'diff_expr'
     DIFFERENCE_TYPE = 'difference_type'
 
+    XAXIS_TITLE = 'Log10 Expression'
+    YAXIS_TITLE = 'Gene'
+
     config_dict = CONFIG_DICT.copy()
 
-    def __init__(self, app, cell_metadata, group_col, counts):
+    def __init__(self, app, cell_metadata, dropdown_col, counts):
         """Visualize two-dimensional embedding of gene expression data"""
-        self.cell_metadata = cell_metadata
-        self.group_col = group_col
+
         self.counts = counts
         self.genes = sorted(counts.columns)
 
-        self.metadata_grouped = self.cell_metadata.groupby(self.group_col)
         self.log_counts = np.log10(self.counts + 1.0)
 
-        super().__init__(app)
+        super().__init__(app, cell_metadata, dropdown_col)
 
     @property
     def layout(self):
@@ -73,13 +74,13 @@ class DifferentialExpression(BaseBlock):
 
         @app.callback(
             Output(self.ID, 'figure'),
-            [Input(SubsetGroup.ID, 'value'),
+            [Input(self.SUBSET_ID, 'value'),
              Input(UMIsVsGenesGate.ID, 'selectedData'),
              Input(SmushedPlot.ID, 'selectedData'),
              Input(self.DIFFERENCE_TYPE, 'value')])
         def update_diff_exp(group_name, selectedDataQC=None,
-                            selectedDataTSNE=None, expression_type=None):
-            group_barcodes = self.metadata_grouped.groups[group_name]
+                            selectedDataTSNE=None, difference_type=None):
+            group_barcodes = self._get_dropdown_barcodes(group_name)
             log_counts = self.log_counts.loc[group_barcodes]
 
             if selectedDataQC and selectedDataQC['points']:
@@ -96,7 +97,7 @@ class DifferentialExpression(BaseBlock):
 
             # if the plate changed without updating the TSNE selection somehow,
             # this will be empty
-            if selected_barcodes:
+            if selectedDataTSNE is not None:
                 unselected_barcodes = [b for b in group_barcodes if
                                        b not in selected_barcodes]
                 selected_barcodes = list(selected_barcodes)
@@ -107,7 +108,7 @@ class DifferentialExpression(BaseBlock):
                 bonferonni_cutoff = diff_stats['p'] < (0.05 / len(diff_stats))
                 z_scores = diff_stats[bonferonni_cutoff]['z']
 
-                if expression_type == "High Expression":
+                if difference_type == "High Expression":
                     z_scores = z_scores[z_scores > 0]
                     genes_to_show = list(z_scores.nlargest(5).index)[::-1]
                 else:
@@ -142,8 +143,8 @@ class DifferentialExpression(BaseBlock):
                              ],
 
                     "layout": go.Layout(title="Differential Expression",
-                                        xaxis={'title': 'Log expression'},
-                                        yaxis={'title': "Gene"},
+                                        xaxis={'title': self.XAXIS_TITLE},
+                                        yaxis={'title': self.YAXIS_TITLE},
                                         boxmode='group'
                                         )
                 }
@@ -160,8 +161,8 @@ class DifferentialExpression(BaseBlock):
                                     name='Selected', orientation='h',
                                     jitter=0.5)],
                     "layout": go.Layout(title="Top Gene Expression",
-                                        xaxis={'title': 'Log Expression'},
-                                        yaxis={'title': "Gene"},
+                                        xaxis={'title': self.XAXIS_TITLE},
+                                        yaxis={'title': self.YAXIS_TITLE},
                                         ),
                 }
 
