@@ -79,6 +79,27 @@ class SparseDataFrame(object):
     def load(self, filename):
         self.matrix, self.rows, self.columns = self.load_from_npz(filename)
 
+    def drop(self, columns, inplace=False):
+        if isinstance(columns, str):
+            drop_set = {columns}
+        else:
+            drop_set = set(columns)
+
+        matrix = self[:, [c for c in self.columns
+                          if c not in drop_set]]
+        columns = [c for c in self.columns if c not in drop_set]
+
+        if inplace:
+            self.matrix, self.columns = matrix, columns
+        else:
+            sdf = SparseDataFrame()
+
+            sdf.matrix = matrix
+            sdf.columns = columns
+            sdf.rows = self.rows[:]
+
+            return sdf
+
     def _get_row(self, row):
         if isinstance(row, str):
             return self.rows.index(row)
