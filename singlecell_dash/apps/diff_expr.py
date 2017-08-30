@@ -63,7 +63,7 @@ class DifferentialExpression(SubsetBase):
     ID = 'diff_expr'
     DIFFERENCE_TYPE = 'difference_type'
 
-    XAXIS_TITLE = 'Log10 Expression'
+    XAXIS_TITLE = 'UMI Counts'
     YAXIS_TITLE = 'Gene'
 
     config_dict = CONFIG_DICT.copy()
@@ -168,7 +168,6 @@ class DifferentialExpression(SubsetBase):
                             title="No differentially expressed genes!")
                     }
 
-                import pdb; pdb.set_trace()
                 x1 = np.concatenate(
                     [np.ravel(self.counts[selected_barcodes, g].todense())
                      for g in genes_to_show])
