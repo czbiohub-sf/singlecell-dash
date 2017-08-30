@@ -150,16 +150,15 @@ class DifferentialExpression(SubsetBase):
                                              unselected_barcodes,
                                              self.counts.columns)
 
-                # Bonferroni cutoff
-                bonferonni_cutoff = diff_stats['p'] < (0.05 / len(diff_stats))
-                z_scores = diff_stats[bonferonni_cutoff]['z']
+                p_cutoff = diff_stats['p'] < (0.001)
+                diff = diff_stats[p_cutoff]['mean1'] - diff_stats[p_cutoff]['mean2']
 
                 if difference_type == "High Expression":
-                    z_scores = z_scores[z_scores > 0]
-                    genes_to_show = list(z_scores.nlargest(5).index)[::-1]
+                    diff = diff[diff > 0]
+                    genes_to_show = list(diff.nlargest(5).index)[::-1]
                 else:
-                    z_scores = z_scores[z_scores < 0]
-                    genes_to_show = list(z_scores.nsmallest(5).index)[::-1]
+                    diff = diff[diff < 0]
+                    genes_to_show = list(diff.nsmallest(5).index)[::-1]
 
                 if not genes_to_show:
                     return {
