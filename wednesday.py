@@ -263,7 +263,7 @@ def sparse_diff_exp(matrix, group1, group2, index):
 
     return df
 
-def run_tissue(tissue, data_folder, samples, k):
+def run_tissue(tissue, data_folder, samples, k, channels_to_drop = []):
     genes_to_drop = 'Malat1|Rn45s|Rpl10|Rpl10a|Rpl10l|Rpl11|Rpl12|Rpl13|Rpl13a|Rpl14|Rpl15|Rpl17|Rpl18|Rpl18a|Rpl19|Rpl21|Rpl22|Rpl22l1|Rpl23|Rpl23a|Rpl24|Rpl26|Rpl27|Rpl27a|Rpl28|Rpl29|Rpl3|Rpl30|Rpl31|Rpl31-ps12|Rpl32|Rpl34|Rpl34-ps1|Rpl35|Rpl35a|Rpl36|Rpl36a|Rpl36al|Rpl37|Rpl37a|Rpl38|Rpl39|Rpl39l|Rpl3l|Rpl4|Rpl41|Rpl5|Rpl6|Rpl7|Rpl7a|Rpl7l1|Rpl8|Rpl9|Rplp0|Rplp1|Rplp2|Rplp2-ps1|Rps10|Rps11|Rps12|Rps13|Rps14|Rps15|Rps15a|Rps15a-ps4|Rps15a-ps6|Rps16|Rps17|Rps18|Rps19|Rps19-ps3|Rps19bp1|Rps2|Rps20|Rps21|Rps23|Rps24|Rps25|Rps26|Rps27|Rps27a|Rps27l|Rps28|Rps29|Rps3|Rps3a|Rps4x|Rps4y2|Rps5|Rps6|Rps6ka1|Rps6ka2|Rps6ka3|Rps6ka4|Rps6ka5|Rps6ka6|Rps6kb1|Rps6kb2|Rps6kc1|Rps6kl1|Rps7|Rps8|Rps9|Rpsa'.split(
         '|')
 
@@ -271,7 +271,7 @@ def run_tissue(tissue, data_folder, samples, k):
     file_suffix = f'-{tissue}-{samples}-{k}'
 
     tenx = common.TenX_Runs(data_folder, tissue=tissue, verbose=True, genes_to_drop=genes_to_drop,
-                            channels_to_drop=['10X_P1_5', '10X_P1_6'])
+                            channels_to_drop=channels_to_drop)
 
     skip = tenx.genes.matrix.shape[0] // samples
     skip = max(skip, 1)
@@ -305,7 +305,7 @@ def run_tissue(tissue, data_folder, samples, k):
 
 
 
-def all_tissues(tissues, data_folder, samples, ks):
+def all_tissues(tissues, data_folder, samples, ks, channels_to_drop=[]):
     genes_to_drop = 'Malat1|Rn45s|Rpl10|Rpl10a|Rpl10l|Rpl11|Rpl12|Rpl13|Rpl13a|Rpl14|Rpl15|Rpl17|Rpl18|Rpl18a|Rpl19|Rpl21|Rpl22|Rpl22l1|Rpl23|Rpl23a|Rpl24|Rpl26|Rpl27|Rpl27a|Rpl28|Rpl29|Rpl3|Rpl30|Rpl31|Rpl31-ps12|Rpl32|Rpl34|Rpl34-ps1|Rpl35|Rpl35a|Rpl36|Rpl36a|Rpl36al|Rpl37|Rpl37a|Rpl38|Rpl39|Rpl39l|Rpl3l|Rpl4|Rpl41|Rpl5|Rpl6|Rpl7|Rpl7a|Rpl7l1|Rpl8|Rpl9|Rplp0|Rplp1|Rplp2|Rplp2-ps1|Rps10|Rps11|Rps12|Rps13|Rps14|Rps15|Rps15a|Rps15a-ps4|Rps15a-ps6|Rps16|Rps17|Rps18|Rps19|Rps19-ps3|Rps19bp1|Rps2|Rps20|Rps21|Rps23|Rps24|Rps25|Rps26|Rps27|Rps27a|Rps27l|Rps28|Rps29|Rps3|Rps3a|Rps4x|Rps4y2|Rps5|Rps6|Rps6ka1|Rps6ka2|Rps6ka3|Rps6ka4|Rps6ka5|Rps6ka6|Rps6kb1|Rps6kb2|Rps6kc1|Rps6kl1|Rps7|Rps8|Rps9|Rpsa'.split('|')
 
     file_prefix = data_folder + '/10x_data/tissues/'
@@ -316,7 +316,7 @@ def all_tissues(tissues, data_folder, samples, ks):
     for tissue in tissues:
         tenx = common.TenX_Runs(data_folder, tissue=tissue, verbose=True,
                                 genes_to_drop=genes_to_drop,
-                                channels_to_drop=['10X_P1_5', '10X_P1_6'])
+                                channels_to_drop=channels_to_drop)
 
 
         skip = tenx.genes.matrix.shape[0] // samples
@@ -374,7 +374,15 @@ def all_tissues(tissues, data_folder, samples, ks):
 
 if __name__ == '__main__':
     tissues = ['Kidney', 'Spleen', 'Heart', 'Marrow', 'Lung', 'Pancreas', 'Colon',
-       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder']
+       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder', 'Mammary']
 
-    all_tissues(tissues, '/Users/james.webber/Desktop', 100, ks=(10,25,50))
+    channels_to_drop = ['10X_P1_5', '10X_P1_6', '10X_P3_10', '10X_P3_11', '10X_P3_12']
+
+    import sys
+    for tissue in tissues:
+        print(f'Processing {tissue}...')
+        run_tissue(tissue, '/data1/maca', samples = int(sys.argv[1]), k = 25, channels_to_drop=channels_to_drop)
+
+    #all_tissues(tissues, '/Users/james.webber/Desktop', 100, ks=(10,25,50), channels_to_drop=channels_to_drop)
+
 
