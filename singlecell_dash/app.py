@@ -20,7 +20,7 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 
 def run_singlecell_dash(cell_metadata, counts, dropdown_col, smushed,
-                        top_genes, javascript=None):
+                        top_genes=None, javascript=None):
     # def run_singlecell_dash(javascript=None):
     app = dash.Dash()
 
@@ -39,14 +39,16 @@ def run_singlecell_dash(cell_metadata, counts, dropdown_col, smushed,
     # gene_vs_gene = GeneVsGene(app, cell_metadata, counts, group_col)
     subset = SubsetGroup(app, cell_metadata[dropdown_col].unique(),
                          name=dropdown_col)
-    color_by_gene_expression = ColorByGeneExpression(app, counts)
-    color_by_metadata = ColorByMetadata(app, counts)
+    color_by_gene_expression = ColorByGeneExpression(app, counts,
+                                                     cell_metadata,
+                                                     dropdown_col)
+    color_by_metadata = ColorByMetadata(app, cell_metadata, dropdown_col)
     smushed = SmushedPlot(app, cell_metadata, dropdown_col, smushed, counts,
-                          top_genes)
+                          top_genes=top_genes)
     diff_expr = DifferentialExpression(app, cell_metadata, dropdown_col,
                                        counts)
     gate = UMIsVsGenesGate(app, cell_metadata, dropdown_col)
-    scatter = GeneVsGene(app, cell_metadata, counts, dropdown_col)
+    gene_vs_gene = GeneVsGene(app, cell_metadata, counts, dropdown_col)
 
     # now insert this component into the app's layout
     app.layout = html.Div([html.H1('Single Cell Dashboard App'),
@@ -55,9 +57,11 @@ def run_singlecell_dash(cell_metadata, counts, dropdown_col, smushed,
                                                color_by_metadata.layout,
                                                smushed.layout],
                                               className='six columns'),
-                                     diff_expr.layout],
+                                     diff_expr.layout
+                                     ],
                                     className='row'),
-                           html.Div([gate.layout, scatter.layout],
+                           html.Div([gate.layout, gene_vs_gene.layout
+                                     ],
                                     className='row')],
                           className='ten columns offset-by-one')
     return app

@@ -1,16 +1,62 @@
 """Visualize 2d embedding (e.g. TSNE) of cell space"""
+from collections import OrderedDict
+
 from dash.dependencies import Output, Input
 import dash_html_components as html
 import dash_core_components as dcc
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
+from scipy import stats
 
 from ..common import diff_exp
 from .base import BaseBlock, CONFIG_DICT
 from .dropdown_subset import SubsetBase
 from .smushed_plot import SmushedPlot
 from .umis_vs_genes import UMIsVsGenesGate
+
+
+def sparse_diff_exp(matrix, group1, group2, index):
+    """Computes differential expression between group 1 and group 2
+    for each column in the dataframe counts.
+
+    Parameters
+    ----------
+    matrix : SparseDataFrame
+        Sparse gene expression data
+    group1 : list of str
+        Ids for the samples in group 1
+    group2 : list of str
+        IDs of the samples in group 2
+    index : list of str
+        Names of the genes in the data
+
+    Returns a dataframe of Z-scores and p-values."""
+
+    g1 = matrix[group1, :]
+    g2 = matrix[group2, :]
+
+    g1mu = np.asarray(g1.mean(0)).flatten()
+    g2mu = np.asarray(g2.mean(0)).flatten()
+
+    mean_diff = g1mu - g2mu
+    # E[X^2] - (E[X])^2
+    pooled_sd = np.sqrt(((g1.power(2)).mean(0) - g1mu ** 2) / len(group1)
+                        + ((g2.power(2)).mean(0) - g2mu ** 2) / len(group2))
+    pooled_sd = np.asarray(pooled_sd).flatten()
+
+    z_scores = np.zeros_like(pooled_sd)
+    nz = pooled_sd > 0
+    z_scores[nz] = np.nan_to_num(mean_diff[nz] / pooled_sd[nz])
+
+    # t-test
+    p_vals = np.clip((1 - stats.norm.cdf(np.abs(z_scores))) * 2 * matrix.shape[1], 0, 1)
+
+    df = pd.DataFrame(OrderedDict([('z', z_scores), ('p', p_vals),
+                                   ('mean1', g1mu), ('mean2', g2mu)]),
+                      index=index)
+
+    return df
 
 
 class DifferentialExpression(SubsetBase):
@@ -79,7 +125,8 @@ class DifferentialExpression(SubsetBase):
         def update_diff_exp(group_name, selectedDataQC=None,
                             selectedDataTSNE=None, difference_type=None):
             group_barcodes = self._get_dropdown_barcodes(group_name)
-            counts = self.genes.loc[group_barcodes]
+
+            # counts = self.counts[group_barcodes, :]
 
             if selectedDataQC and selectedDataQC['points']:
                 group_barcodes = [d['customdata'] for d in
@@ -99,8 +146,9 @@ class DifferentialExpression(SubsetBase):
                 unselected_barcodes = [b for b in group_barcodes if
                                        b not in selected_barcodes]
                 selected_barcodes = list(selected_barcodes)
-                diff_stats = diff_exp(counts, selected_barcodes,
-                                      unselected_barcodes)
+                diff_stats = sparse_diff_exp(self.counts, selected_barcodes,
+                                             unselected_barcodes,
+                                             self.counts.columns)
 
                 # Bonferroni cutoff
                 bonferonni_cutoff = diff_stats['p'] < (0.05 / len(diff_stats))
@@ -120,14 +168,15 @@ class DifferentialExpression(SubsetBase):
                             title="No differentially expressed genes!")
                     }
 
+                import pdb; pdb.set_trace()
                 x1 = np.concatenate(
-                    [counts.loc[selected_barcodes, g] for g in
-                     genes_to_show])
+                    [np.ravel(self.counts[selected_barcodes, g].todense())
+                     for g in genes_to_show])
                 y1 = np.concatenate(
                     [[g] * len(selected_barcodes) for g in genes_to_show])
                 x2 = np.concatenate(
-                    [counts.loc[unselected_barcodes, g] for g in
-                     genes_to_show])
+                    [np.ravel(self.counts[unselected_barcodes, g].todense())
+                     for g in genes_to_show])
                 y2 = np.concatenate(
                     [[g] * len(unselected_barcodes) for g in genes_to_show])
 
@@ -147,18 +196,19 @@ class DifferentialExpression(SubsetBase):
                                         )
                 }
             else:
-                genes_to_show = counts.mean().nlargest(5).index
-
-                x1 = np.concatenate(
-                    [counts.loc[group_barcodes, g] for g in genes_to_show])
-                y1 = np.concatenate(
-                    [[g] * len(group_barcodes) for g in genes_to_show])
-
+                # genes_to_show = counts.mean().nlargest(5).index
+                #
+                # x1 = np.concatenate(
+                #     [counts[group_barcodes, g] for g in genes_to_show])
+                # y1 = np.concatenate(
+                #     [[g] * len(group_barcodes) for g in genes_to_show])
+                # data = [go.Box(x=x1, y=y1,
+                #                     name='Selected', orientation='h',
+                #                     jitter=0.5)]
                 return {
-                    "data": [go.Box(x=x1, y=y1,
-                                    name='Selected', orientation='h',
-                                    jitter=0.5)],
-                    "layout": go.Layout(title="Top Gene Expression",
+                    "data": [],
+                    "layout": go.Layout(
+                        title="Select cells to see differential expression",
                                         xaxis={'title': self.XAXIS_TITLE},
                                         yaxis={'title': self.YAXIS_TITLE},
                                         ),

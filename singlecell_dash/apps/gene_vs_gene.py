@@ -7,13 +7,13 @@ import plotly.graph_objs as go
 
 from .base import BaseBlock, CONFIG_DICT
 from .color_by import ColorByGeneExpression, ColorByMetadata
-from .dropdown_subset import SubsetGroup
+from .dropdown_subset import SubsetBase
 from .umis_vs_genes import UMIsVsGenesGate
 
 AXIS_TYPES = 'Linear', 'Log'
 
 
-class GeneVsGene(BaseBlock):
+class GeneVsGene(SubsetBase):
     ID = 'gene_vs_gene_plot'
 
     def __init__(self, app, cell_metadata, counts, group_col,
@@ -29,7 +29,7 @@ class GeneVsGene(BaseBlock):
 
         self.metadata_grouped = self.cell_metadata.groupby(self.group_col)
 
-        super().__init__(app)
+        super().__init__(app, cell_metadata, group_col)
 
     @property
     def layout(self):
@@ -87,7 +87,7 @@ class GeneVsGene(BaseBlock):
              Input('yaxis-column', 'value'),
              Input('xaxis-type', 'value'),
              Input('yaxis-type', 'value'),
-             Input(SubsetGroup.ID, 'value'),
+             Input(self.SUBSET_ID, 'value'),
              Input(UMIsVsGenesGate.ID, 'selectedData')
              ])
         def update_gene_vs_gene_scatter(xaxis_col, yaxis_col,
@@ -95,11 +95,20 @@ class GeneVsGene(BaseBlock):
                                         group_name, selectedData):
             """Update the gene vs gene scatter plot"""
 
-            group_barcodes = self.metadata_grouped.groups[group_name]
+            group_barcodes = self._get_dropdown_barcodes(group_name)
 
-            group_counts = self.counts.loc[group_barcodes]
-            alpha = pd.Series(1.0, index=group_counts.index)
-            hovertext = group_counts[[xaxis_col, yaxis_col]].apply(
+            # Can't use self.counts[group_barcodes, columns] to index the
+            # SparseDataFrame so select the genes first and then subset on
+            # cells
+            columns = [xaxis_col, yaxis_col]
+            data = pd.DataFrame(self.counts[columns].todense(),
+                                index=self.counts.rows, columns=columns)
+
+            # row = [self.counts._get_row(i) for i in group_barcodes]
+            # self.counts[np.array(group_barcodes)[:, None], columns]
+            group_counts = data.loc[group_barcodes, :]
+            alpha = pd.Series(1.0, index=group_barcodes)
+            hovertext = group_counts[columns].apply(
                 lambda x: '{}: {}, {}'.format(x.name, x[0], x[1]), 1)
 
             if selectedData and selectedData['points']:

@@ -41,14 +41,17 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host,
     nrows = 100 if debug else None
 
     tenx_runs = TenX_Runs(data_folder, genes_to_drop=genes_to_drop,
-                          verbose=verbose, nrows=nrows, tissue=subset)
+                          verbose=verbose, nrows=nrows, tissue=subset,
+                          channels_to_drop=['10X_P1_5', '10X_P1_6',
+                                            '10X_P3_10', '10X_P3_11',
+                                            '10X_P3_12'])
 
     app = run_singlecell_dash(cell_metadata=tenx_runs.cell_metadata,
                               counts=tenx_runs.genes,
                               dropdown_col=dropdown_col,
-                              smushed=tenx_runs.cell_smushed)
+                              smushed=tenx_runs.cell_smushed,
+                              javascript=javascript)
 
-    # app = run_singlecell_dash()
     # this is where the magic happens
     app.run_server(host=host, debug=debug, port=port)
 

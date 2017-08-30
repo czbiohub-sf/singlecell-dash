@@ -26,9 +26,6 @@ class SmushedPlot(SubsetBase):
 
         self.top_genes = top_genes
 
-        self.log_counts = np.log10(self.counts + 1.0)
-        self.log_counts_max = self.log_counts.max().max()
-
         self.metadata_columns = cell_metadata.columns.difference(
             [dropdown_col])
 
@@ -36,8 +33,7 @@ class SmushedPlot(SubsetBase):
 
     @property
     def layout(self):
-        return dcc.Graph(id=self.ID,
-                      config=self.config_dict.copy())
+        return dcc.Graph(id=self.ID, config=self.config_dict.copy())
 
     def _top_genes_hovertext(self, barcode):
         """Return an HTML string of the top genes for each cell (barcode)"""
@@ -57,7 +53,6 @@ class SmushedPlot(SubsetBase):
 
         if data_type is not None and 'expression'.startswith(data_type):
             cmin = 0.0
-            cmax = self.log_counts_max
 
         kwargs['marker'] = dict(color=color, cmin=cmin, cmax=cmax,
                                 colorscale='Viridis', opacity=opacity,
@@ -71,21 +66,14 @@ class SmushedPlot(SubsetBase):
                              customdata=customdata, name=name, **kwargs)
         return scatter
 
-    @staticmethod
-    def _values_hovertext(series):
-        ids = series.index
-        values = series.values
-        strings = ['{}: {:.1f}'.format(i, v) for i, v in zip(ids, values)]
-        return pd.Series(strings, index=ids)
-
     def callbacks(self, app):
 
         @app.callback(
             Output(self.ID, 'figure'),
             [Input(self.SUBSET_ID, 'value'),
              Input(UMIsVsGenesGate.ID, 'selectedData'),
-             Input(ColorByGeneExpression.ID, 'value'),
-             Input(ColorByMetadata.ID, 'value')])
+             Input(ColorByGeneExpression.GENE_ID, 'value'),
+             Input(ColorByMetadata.METADATA_ID, 'value')])
         def update_cell_tsne(group_name, selectedDataQC=None,
                              selected_gene=None, selected_metadata=None):
             smushed = self.smushed[group_name]
@@ -93,8 +81,11 @@ class SmushedPlot(SubsetBase):
 
             if selected_gene and not selected_metadata:
                 group_barcodes = self._get_dropdown_barcodes(group_name)
-                log_gene_data = self.log_counts.loc[group_barcodes,
-                                                    selected_gene]
+
+                data = np.ravel(self.counts[group_barcodes,
+                                            selected_gene].todense())
+                gene_data = pd.Series(data, index=group_barcodes)
+                log_gene_data = np.log10(gene_data + 1)
                 hovertext = self._values_hovertext(log_gene_data)
             else:
                 log_gene_data = None
@@ -106,6 +97,8 @@ class SmushedPlot(SubsetBase):
 
                 alpha.loc[~alpha.index.isin(barcodes)] = 0.1
                 hovertext[~hovertext.index.isin(barcodes)] = ''
+
+            scatters = []
 
             if selected_metadata:
                 groupby = self.cell_metadata[selected_metadata]
@@ -119,25 +112,27 @@ class SmushedPlot(SubsetBase):
                                             colorbar_title=selected_metadata,
                                             text=hovertext.values,
                                             customdata=smushed.index)
-                    scatters = [scatter]
+                    scatters.append(scatter)
                 except ValueError:
                     scatters = []
                     # Categorical data: plot every group
                     for name, df in smushed.groupby(groupby):
                         scatter = self._scatter(df, name=name,
                                                 opacity=alpha.loc[df.index],
-                                                text=hovertext.loc[df.index],
+                                                text=hovertext.loc[df.index].values,
                                                 customdata=df.index)
                         scatters.append(scatter)
             else:
-                scatter = self._scatter(smushed, color=log_gene_data,
-                                        showscale=bool(selected_gene),
-                                        colorbar_title='log10 KPM',
-                                        data_type='expression',
-                                        text=hovertext.values,
-                                        customdata=smushed.index,
-                                        opacity=alpha)
-                scatters = [scatter]
+                for cluster, df in smushed.groupby('cluster'):
+                    scatter = self._scatter(df, color=log_gene_data,
+                                            showscale=bool(selected_gene),
+                                            colorbar_title='log10 KPM',
+                                            data_type='expression',
+                                            name='cluster ' + str(cluster),
+                                            text=hovertext.loc[df.index].values,
+                                            customdata=df.index,
+                                            opacity=alpha.loc[df.index])
+                    scatters.append(scatter)
 
             return {
                 "data": scatters,

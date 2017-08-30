@@ -51,4 +51,4 @@ class SubsetBase(BaseBlock):
     def _get_dropdown_barcodes(self, group_name):
         """Given the name of a group, get the cells/barcodes of that group"""
         # TODO: add logic to deal with the special case of "All" samples
-        return self.metadata_grouped.groups[group_name]
+        return self.metadata_grouped.groups[group_name].values.tolist()

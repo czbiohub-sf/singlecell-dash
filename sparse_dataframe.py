@@ -141,3 +141,7 @@ class SparseDataFrame(object):
     def __setitem__(self, item, value):
         item = self._convert_item(item)
         self.matrix[item] = value
+
+    @property
+    def shape(self):
+        return self.matrix.shape

@@ -4,16 +4,15 @@ import dash_core_components as dcc
 import pandas as pd
 import plotly.graph_objs as go
 
-from .base import BaseBlock, CONFIG_DICT
-from .color_by import ColorByGeneExpression, ColorByMetadata
-from .dropdown_subset import SubsetGroup
+from .base import CONFIG_DICT
+from .dropdown_subset import SubsetBase
 
 
-class UMIsVsGenesGate(BaseBlock):
+class UMIsVsGenesGate(SubsetBase):
 
     ID = 'umis_vs_genes'
     
-    def __init__(self, app, cell_metadata, group_col,
+    def __init__(self, app, cell_metadata, dropdown_col,
                  n_molecules_col='total_reads',
                  n_genes_col='n_genes'):
         """Show number of molecules vs number of genes and 'gate' the cells
@@ -29,13 +28,10 @@ class UMIsVsGenesGate(BaseBlock):
             Column name in "cell_metadata" indicating the total number of genes 
             detected per cell
         """
-        self.cell_metadata = cell_metadata
-        self.group_col = group_col
         self.n_molecules_col = n_molecules_col
         self.n_genes_col = n_genes_col
-        self.metadata_grouped = self.cell_metadata.groupby(self.group_col)
 
-        super().__init__(app)
+        super().__init__(app, cell_metadata, dropdown_col)
 
     @property
     def layout(self):
@@ -51,7 +47,7 @@ class UMIsVsGenesGate(BaseBlock):
 
         @app.callback(
             Output(self.ID, 'figure'),
-            [Input(SubsetGroup.ID, 'value'),
+            [Input(self.SUBSET_ID, 'value'),
              # Input(SmushedPlot.SELECTED_GENE_ID, 'value'),
              # Input(SmushedPlot.SELECTED_METADATA_ID, 'value')
              ])
@@ -59,11 +55,12 @@ class UMIsVsGenesGate(BaseBlock):
                                   selected_metadata=None):
             """When a group is selected, update the reads v genes scatter"""
 
-            group_barcodes = self.metadata_grouped.groups[group_name]
+            group_barcodes = self._get_dropdown_barcodes(group_name)
             group_metadata_subset = self.cell_metadata.loc[group_barcodes]
 
             x = group_metadata_subset[self.n_molecules_col]
             y = group_metadata_subset[self.n_genes_col]
+
 
             return {
                 "data": [go.Scatter(x=x,
