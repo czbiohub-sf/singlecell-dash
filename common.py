@@ -1,11 +1,44 @@
 import glob
 import os
 import datetime
+
+from collections import OrderedDict
+
 import pandas as pd
 import numpy as np
+
 from sklearn.manifold import TSNE
+
 import scipy.stats as stats
-from collections import OrderedDict
+import scipy.sparse as sparse
+
+from sparse_dataframe import SparseDataFrame
+
+
+def combine_sdf_files(run_folder, folders, verbose=False, **kwargs):
+    """function for concatenating SparseDataFrames together"""
+    combined = SparseDataFrame()
+    combined.rows = []
+    columns = set()
+
+    for folder in folders:
+        filename = os.path.join(run_folder, folder, f'{folder}.mus.cell-gene.npz')
+        if verbose:
+            print(f'Reading {filename} ...')
+        sdf = SparseDataFrame(filename)
+        columns.add(tuple(sdf.columns))
+        combined.rows.extend(sdf.rows)
+        if combined.matrix is None:
+            combined.matrix = sdf.matrix
+        else:
+            combined.matrix = sparse.vstack((combined.matrix, sdf.matrix),
+                                            format='csc')
+
+    assert len(columns) == 1
+
+    combined.columns = columns.pop()
+
+    return combined
 
 
 def combine_csv_files(folder, globber, verbose=False, **kwargs):
@@ -52,23 +85,35 @@ def clean_mapping_stats(mapping_stats_original, convert_to_percentage=None):
     return numeric
 
 
-def diff_exp(counts, group1, group2):
+
+def diff_exp(matrix, group1, group2, index):
     """Computes differential expression between group 1 and group 2
     for each column in the dataframe counts.
 
     Returns a dataframe of Z-scores and p-values."""
 
-    mean_diff = counts.loc[group1].mean() - counts.loc[group2].mean()
-    pooled_sd = np.sqrt(counts.loc[group1].var()/len(group1)
-                        + counts.loc[group2].var()/len(group2))
-    z_scores = mean_diff/pooled_sd
-    z_scores = z_scores.fillna(0)
+    g1 = matrix[group1, :]
+    g2 = matrix[group2, :]
+
+    g1mu = g1.mean(0)
+    g2mu = g2.mean(0)
+
+    mean_diff = np.asarray(g1mu - g2mu).flatten()
+    # E[X^2] - (E[X])^2
+    pooled_sd = np.sqrt(
+        ((g1.power(2)).mean(0) - np.power(g1mu, 2)) / len(group1)
+        + ((g2.power(2)).mean(0) - np.power(g2mu, 2)) / len(group2))
+    pooled_sd = np.asarray(pooled_sd).flatten()
+
+    z_scores = np.zeros_like(pooled_sd)
+    nz = pooled_sd > 0
+    z_scores[nz] = np.nan_to_num(mean_diff[nz] / pooled_sd[nz])
 
     # t-test
-    p_vals = (1 - stats.norm.cdf(np.abs(z_scores)))*2
+    p_vals = (1 - stats.norm.cdf(np.abs(z_scores))) * 2
 
-    df = pd.DataFrame({'z': z_scores})
-    df['p'] = p_vals
+    df = pd.DataFrame(OrderedDict([('z', z_scores), ('p', p_vals)]),
+                      index=index)
 
     return df
 
@@ -366,20 +411,28 @@ class TenX_Runs(Plates):
                           'Fraction Reads in Cells'}
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
-                 verbose=False, nrows=None):
+                 verbose=False, nrows=None, tissue=None, channels_to_drop=[]):
 
         run_folder = os.path.join(data_folder, '10x_data')
 
-        counts = self.combine_cell_files(run_folder, '*/10X_P*cell-gene.csv',
-            verbose=verbose)
-        mapping_stats = self.combine_metrics_files(
-                run_folder, '*/metrics_summary.csv')
-
-        # these files were hand-formatted to be consistent.
-        # TODO: auto-format 10x metadata
         self.plate_metadata = combine_csv_files(run_folder,
                                                 'MACA_10X_P*.csv',
                                                 index_col=0, nrows=nrows)
+
+        if tissue is not None:
+            folders = self.plate_metadata.index[self.plate_metadata['Tissue'] == tissue]
+
+        else:
+            folders = self.plate_metadata.index
+
+        folders = [f for f in folders if os.path.exists(os.path.join(run_folder, f))]
+        folders = [f for f in folders if f not in channels_to_drop]
+
+        counts = combine_sdf_files(run_folder, folders,
+                                   verbose=verbose)
+
+        mapping_stats = self.combine_metrics_files(
+                run_folder, folders)
 
         self.genes, self.cell_metadata, self.mapping_stats = \
             self.clean_and_reformat(counts, mapping_stats)
@@ -389,27 +442,16 @@ class TenX_Runs(Plates):
         self.plate_metadata = self.plate_metadata.loc[
             self.plate_summaries.index]
 
-        if not os.path.exists(os.path.join(data_folder, 'coords')):
-            os.mkdir(os.path.join(data_folder, 'coords'))
-
-        self.bulk_smushed_cache_file = os.path.join(data_folder, 'coords',
-                                                    'bulk_10x_smushed.csv')
-        self.cell_smushed_cache_file = os.path.join(data_folder, 'coords',
-                                                    'cell_10x_smushed.pickle')
-
-        self.bulk_smushed = self.compute_bulk_smushing()
-        self.cell_smushed = self.compute_cell_smushing()
-
         self.gene_names = sorted(self.genes.columns)
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
 
         # Remove pesky genes
-        self.genes = self.genes.drop(genes_to_drop, axis=1)
+        self.genes = self.genes.drop(genes_to_drop)
 
         # Get a counts per million rescaling of the genes
-        self.counts_per_million = self.genes.divide(self.genes.sum(axis=1),
-                                                    axis=0) * 1e6
-        self.top_genes = self.compute_top_genes_per_cell()
+        # self.counts_per_million = self.genes.divide(self.genes.sum(axis=1),
+        #                                             axis=0) * 1e6
+        # self.top_genes = self.compute_top_genes_per_cell()
 
         self.data = {'genes': self.genes,
                      'mapping_stats': self.mapping_stats,
@@ -419,7 +461,7 @@ class TenX_Runs(Plates):
 
     def __repr__(self):
         n_channels = self.plate_summaries.shape[0]
-        n_barcodes = self.genes.shape[0]
+        n_barcodes = len(self.genes.rows)
         s = f'This is an object holding data for {n_channels} 10X channels and ' \
             f'{n_barcodes} barcodes.\nHere are the accessible dataframes:\n'
 
@@ -441,14 +483,16 @@ class TenX_Runs(Plates):
             df.index = pd.MultiIndex.from_product(([channel], df.index),
                                                   names=['channel', 'cell_id'])
             dfs.append(df)
+
         combined = pd.concat(dfs)
         return combined
 
     @staticmethod
-    def combine_metrics_files(folder, globber):
+    def combine_metrics_files(run_folder, folders):
         dfs = []
 
-        for filename in glob.iglob(os.path.join(folder, globber)):
+        for folder in folders:
+            filename = os.path.join(run_folder, folder, 'metrics_summary.csv')
             p_name = os.path.basename(os.path.dirname(filename))
             df = pd.read_csv(filename)
             df[TenX_Runs.SAMPLE_MAPPING] = p_name
@@ -475,7 +519,7 @@ class TenX_Runs(Plates):
 
         Returns
         -------
-        genes : pandas.DataFrame
+        genes : SparseDataFrame
             A (samples, genes) dataframe of integer number of reads that mapped
             to a gene in a cell
         cell_metadata : pandas.DataFrame
@@ -487,18 +531,19 @@ class TenX_Runs(Plates):
             began, number of input reads, number of mapped reads, and other
             information output by CellRanger, with numbers properly formatted
         """
-        counts.sort_index(inplace=True)
-        channel_ids = counts.index.get_level_values(0)
+        # counts.sort_index(inplace=True)
+        # channel_ids = counts.index.get_level_values(0)
+        channel_ids = [c.rsplit('_', 1)[0] for c in counts.rows]
 
         mapping_stats = clean_mapping_stats(
                 mapping_stats,
                 convert_to_percentage=TenX_Runs.COLUMNS_TO_CONVERT
         )
 
-        sample_ids = pd.Series(
-                '{}_{}'.format(channel, index) for channel, index in
-                counts.index
-        )
+        sample_ids = pd.Series(counts.rows)
+        #         '{}_{}'.format(channel, index) for channel, index in
+        #         counts.index
+        # )
 
         cell_metadata = pd.DataFrame(
                 index=sample_ids,
@@ -514,12 +559,15 @@ class TenX_Runs(Plates):
                            or col.endswith('_transgene'))]
 
         # Separate counts of everything from genes-only
-        genes = counts[gene_names]
+        genes = SparseDataFrame()
+        genes.matrix = counts[gene_names]
+        genes.columns = gene_names[:]
+        genes.rows = counts.rows[:]
 
         # Add mapping and ERCC counts to cell metadata
-        cell_metadata['total_reads'] = counts.sum(axis=1)
-        cell_metadata['n_genes'] = (genes > 0).sum(axis=1)
-        cell_metadata['mapped_reads'] = genes.sum(axis=1)
+        cell_metadata['total_reads'] = counts.matrix.sum(axis=1)
+        cell_metadata['n_genes'] = (genes.matrix > 0).sum(axis=1)
+        cell_metadata['mapped_reads'] = genes.matrix.sum(axis=1)
         cell_metadata['ercc'] = counts[ercc_names].sum(axis=1)
 
         return genes, cell_metadata, mapping_stats
@@ -530,16 +578,16 @@ class TenX_Runs(Plates):
 
         total_reads = self.mapping_stats['Number of Reads']
 
-        percent_rn45s = self.genes['Rn45s'].groupby(
-                self.cell_metadata[TenX_Runs.SAMPLE_MAPPING]
-        ).sum() / total_reads
+        # percent_rn45s = pd.Series(self.genes['Rn45s'].todense()).groupby(
+        #         self.cell_metadata[TenX_Runs.SAMPLE_MAPPING]
+        # ).sum() / total_reads
 
         percent_ercc = channel_map['ercc'].sum().divide(total_reads, axis=0)
 
         plate_summaries = pd.concat(
                 [self.mapping_stats,
                  pd.DataFrame(OrderedDict([
-                     ('Percent Rn45s', percent_rn45s),
+                     # ('Percent Rn45s', percent_rn45s),
                      (TenX_Runs.PERCENT_ERCC, percent_ercc),
                      ('n_barcodes', channel_map.size())
                  ]))], axis=1
