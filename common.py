@@ -15,13 +15,14 @@ import scipy.sparse as sparse
 from sparse_dataframe import SparseDataFrame
 
 
-def combine_sdf_files(folder, globber, verbose=False, **kwargs):
+def combine_sdf_files(run_folder, folders, verbose=False, **kwargs):
     """function for concatenating SparseDataFrames together"""
     combined = SparseDataFrame()
     combined.rows = []
     columns = set()
 
-    for filename in glob.iglob(os.path.join(folder, globber)):
+    for folder in folders:
+        filename = os.path.join(run_folder, folder, f'{folder}.mus.cell-gene.npz')
         if verbose:
             print(f'Reading {filename} ...')
         sdf = SparseDataFrame(filename)
@@ -410,20 +411,28 @@ class TenX_Runs(Plates):
                           'Fraction Reads in Cells'}
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
-                 verbose=False, nrows=None):
+                 verbose=False, nrows=None, tissue=None, channels_to_drop=[]):
 
         run_folder = os.path.join(data_folder, '10x_data')
 
-        counts = combine_sdf_files(run_folder, '*/10X_P*cell-gene.npz',
-                                   verbose=verbose)
-        mapping_stats = self.combine_metrics_files(
-                run_folder, '*/metrics_summary.csv')
-
-        # these files were hand-formatted to be consistent.
-        # TODO: auto-format 10x metadata
         self.plate_metadata = combine_csv_files(run_folder,
                                                 'MACA_10X_P*.csv',
                                                 index_col=0, nrows=nrows)
+
+        if tissue is not None:
+            folders = self.plate_metadata.index[self.plate_metadata['Tissue'] == tissue]
+
+        else:
+            folders = self.plate_metadata.index
+
+        folders = [f for f in folders if os.path.exists(os.path.join(run_folder, f))]
+        folders = [f for f in folders if f not in channels_to_drop]
+
+        counts = combine_sdf_files(run_folder, folders,
+                                   verbose=verbose)
+
+        mapping_stats = self.combine_metrics_files(
+                run_folder, folders)
 
         self.genes, self.cell_metadata, self.mapping_stats = \
             self.clean_and_reformat(counts, mapping_stats)
@@ -479,10 +488,11 @@ class TenX_Runs(Plates):
         return combined
 
     @staticmethod
-    def combine_metrics_files(folder, globber):
+    def combine_metrics_files(run_folder, folders):
         dfs = []
 
-        for filename in glob.iglob(os.path.join(folder, globber)):
+        for folder in folders:
+            filename = os.path.join(run_folder, folder, 'metrics_summary.csv')
             p_name = os.path.basename(os.path.dirname(filename))
             df = pd.read_csv(filename)
             df[TenX_Runs.SAMPLE_MAPPING] = p_name
