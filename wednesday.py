@@ -272,6 +272,9 @@ def run_tissue(tissue, data_folder, samples, k):
     bigten.to_csv(file_prefix + 'diff exp' + file_suffix + '.csv')
 
 if __name__ == '__main__':
+    for tissue in ['Kidney', 'Spleen', 'Heart', 'Marrow', 'Lung', 'Pancreas', 'Colon',
+       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder',
+       'Thymus', 'Mammary']:
 
-    run_tissue('Liver', '/data1/maca', samples=1000, k=25)
+        run_tissue(tissue, '/data1/maca', samples=1000, k=25)
 
