@@ -442,6 +442,13 @@ class TenX_Runs(Plates):
         self.plate_metadata = self.plate_metadata.loc[
             self.plate_summaries.index]
 
+        smushed_folder = os.path.join(data_folder, 'coords')
+
+        if not os.path.exists(smushed_folder):
+            os.mkdir(smushed_folder)
+
+        self.cell_smushed = self.read_tissue_smushed(smushed_folder)
+
         self.gene_names = sorted(self.genes.columns)
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
 
@@ -594,3 +601,13 @@ class TenX_Runs(Plates):
         )
 
         return plate_summaries
+
+    def read_tissue_smushed(self, folder):
+        smusheds = {}
+        for filename in glob.iglob(os.path.join(folder, 'smushed-*')):
+            tissue = filename.split('smushed-')[-1].split('.')[0]
+            tissue = tissue.split('-')[0]
+            df = pd.read_csv(filename, index_col=0)
+            smusheds[tissue] = df
+            assert len(df.columns.difference(['0', '1', 'community'])) == 0
+        return smusheds

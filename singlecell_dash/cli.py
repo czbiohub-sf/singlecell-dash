@@ -23,6 +23,9 @@ from singlecell_dash.app import run_singlecell_dash
 @click.option('--dropdown-col', default='Tissue',
               help='Column in metadata to use for creating dropdown menu to '
                    'subset data for viewing')
+@click.option('--subset', default=None,
+              help="Value in metadata's --dropdown-col to use to on a small "
+                   "portion of data")
 @click.option('--javascript',
               help="Location of an arbitrary javacsript file you want to add"
                    " to the Dash app", default=None)
@@ -30,19 +33,20 @@ from singlecell_dash.app import run_singlecell_dash
               is_flag=True)
 @click.version_option(version='v0.1.0')
 def cli(data_folder, metadata, genes_to_drop, verbose, port, host,
-        dropdown_col, javascript, debug):
+        dropdown_col, subset, javascript, debug):
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
     # plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
     #                 verbose=verbose)
 
+    nrows = 100 if debug else None
+
     tenx_runs = TenX_Runs(data_folder, genes_to_drop=genes_to_drop,
-                          verbose=verbose)
+                          verbose=verbose, nrows=nrows, tissue=subset)
 
     app = run_singlecell_dash(cell_metadata=tenx_runs.cell_metadata,
-                              counts=tenx_runs.counts_per_million,
+                              counts=tenx_runs.genes,
                               dropdown_col=dropdown_col,
-                              smushed=tenx_runs.cell_smushed,
-                              top_genes=tenx_runs.top_genes)
+                              smushed=tenx_runs.cell_smushed)
 
     # app = run_singlecell_dash()
     # this is where the magic happens

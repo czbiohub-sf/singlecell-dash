@@ -50,7 +50,6 @@ class SparseDataFrame(object):
         matrix = scipy.sparse.csc_matrix(df.as_matrix(), dtype='int32')
         rows = [str(i) for i in df.index]
         columns = [str(i) for i in df.columns]
-
         return matrix, rows, columns
 
     @staticmethod

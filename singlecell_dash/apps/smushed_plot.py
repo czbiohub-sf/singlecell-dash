@@ -7,19 +7,18 @@ import pandas as pd
 import plotly.graph_objs as go
 
 from .base import BaseBlock, CONFIG_DICT
+from .color_by import ColorByGeneExpression, ColorByMetadata
 from .dropdown_subset import SubsetBase
 from .umis_vs_genes import UMIsVsGenesGate
 
 
 class SmushedPlot(SubsetBase):
     ID = 'smushed'
-    SELECTED_GENE_ID = 'selected_gene'
-    SELECTED_METADATA_ID = 'selected_metadata'
 
     config_dict = CONFIG_DICT.copy()
 
     def __init__(self, app, cell_metadata, dropdown_col, smushed, counts,
-                 top_genes):
+                 top_genes=None):
         """Visualize two-dimensional embedding of gene expression data"""
         self.smushed = smushed
         self.counts = counts
@@ -37,55 +36,18 @@ class SmushedPlot(SubsetBase):
 
     @property
     def layout(self):
-        return html.Div([
-            html.H4('Cell TSNE', className='row',
-                    style={'padding-top': '20px'}),
-
-            html.Div([  # gene selector
-                html.Label('Color by gene expression: ',
-                           htmlFor=self.SELECTED_GENE_ID,
-                           className='four columns offset-by-two'
-                           ),
-                dcc.Dropdown(
-                    id=self.SELECTED_GENE_ID,
-                    options=[{'label': i, 'value': i} for i in
-                             self.genes],
-                    value='',
-                    className='six columns'
-                ),
-            ],
-                className='row',
-            ),
-
-            html.Div([  # gene selector
-                html.Label('Color by cell metadata: ',
-                           htmlFor=self.SELECTED_METADATA_ID,
-                           className='four columns offset-by-two'
-                           ),
-                dcc.Dropdown(
-                    id=self.SELECTED_METADATA_ID,
-                    options=[{'label': i, 'value': i} for i in
-                             self.metadata_columns],
-                    value='',
-                    className='six columns'
-                ),
-            ],
-                className='row',
-            ),
-
-            # 2d embedding/TSNE plot
-            dcc.Graph(id=self.ID,
+        return dcc.Graph(id=self.ID,
                       config=self.config_dict.copy())
-        ],
-            className='six columns'
-        )
 
     def _top_genes_hovertext(self, barcode):
         """Return an HTML string of the top genes for each cell (barcode)"""
-        first_line = '{}<br>Top genes:<br>'.format(barcode)
-        top_genes = ['{}. {}'.format(i + 1, gene)
-                     for i, gene in enumerate(self.top_genes[barcode])]
-        return first_line + '<br>'.join(top_genes)
+        if self.top_genes is not None:
+            first_line = '{}<br>Top genes:<br>'.format(barcode)
+            top_genes = ['{}. {}'.format(i + 1, gene)
+                         for i, gene in enumerate(self.top_genes[barcode])]
+            return first_line + '<br>'.join(top_genes)
+        else:
+            return barcode
 
     def _scatter(self, df, color=None, data_type=None, opacity=None,
                  showscale=False, colorbar_title=None, text=None,
@@ -122,8 +84,8 @@ class SmushedPlot(SubsetBase):
             Output(self.ID, 'figure'),
             [Input(self.SUBSET_ID, 'value'),
              Input(UMIsVsGenesGate.ID, 'selectedData'),
-             Input(self.SELECTED_GENE_ID, 'value'),
-             Input(self.SELECTED_METADATA_ID, 'value')])
+             Input(ColorByGeneExpression.ID, 'value'),
+             Input(ColorByMetadata.ID, 'value')])
         def update_cell_tsne(group_name, selectedDataQC=None,
                              selected_gene=None, selected_metadata=None):
             smushed = self.smushed[group_name]

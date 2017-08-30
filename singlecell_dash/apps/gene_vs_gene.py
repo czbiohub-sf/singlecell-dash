@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objs as go
 
 from .base import BaseBlock, CONFIG_DICT
+from .color_by import ColorByGeneExpression, ColorByMetadata
 from .dropdown_subset import SubsetGroup
 from .umis_vs_genes import UMIsVsGenesGate
 

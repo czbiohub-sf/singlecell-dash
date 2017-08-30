@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.graph_objs as go
 
 from .apps.diff_expr import DifferentialExpression
+from .apps.color_by import ColorByGeneExpression, ColorByMetadata
 from .apps.gene_vs_gene import GeneVsGene
 from .apps.smushed_plot import SmushedPlot
 from .apps.dropdown_subset import SubsetGroup
@@ -38,6 +39,8 @@ def run_singlecell_dash(cell_metadata, counts, dropdown_col, smushed,
     # gene_vs_gene = GeneVsGene(app, cell_metadata, counts, group_col)
     subset = SubsetGroup(app, cell_metadata[dropdown_col].unique(),
                          name=dropdown_col)
+    color_by_gene_expression = ColorByGeneExpression(app, counts)
+    color_by_metadata = ColorByMetadata(app, counts)
     smushed = SmushedPlot(app, cell_metadata, dropdown_col, smushed, counts,
                           top_genes)
     diff_expr = DifferentialExpression(app, cell_metadata, dropdown_col,
@@ -48,7 +51,11 @@ def run_singlecell_dash(cell_metadata, counts, dropdown_col, smushed,
     # now insert this component into the app's layout
     app.layout = html.Div([html.H1('Single Cell Dashboard App'),
                            subset.layout,
-                           html.Div([smushed.layout, diff_expr.layout],
+                           html.Div([html.Div([color_by_gene_expression.layout,
+                                               color_by_metadata.layout,
+                                               smushed.layout],
+                                              className='six columns'),
+                                     diff_expr.layout],
                                     className='row'),
                            html.Div([gate.layout, scatter.layout],
                                     className='row')],

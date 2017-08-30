@@ -28,8 +28,6 @@ class DifferentialExpression(SubsetBase):
         self.counts = counts
         self.genes = sorted(counts.columns)
 
-        self.log_counts = np.log10(self.counts + 1.0)
-
         super().__init__(app, cell_metadata, dropdown_col)
 
     @property
@@ -81,7 +79,7 @@ class DifferentialExpression(SubsetBase):
         def update_diff_exp(group_name, selectedDataQC=None,
                             selectedDataTSNE=None, difference_type=None):
             group_barcodes = self._get_dropdown_barcodes(group_name)
-            log_counts = self.log_counts.loc[group_barcodes]
+            counts = self.genes.loc[group_barcodes]
 
             if selectedDataQC and selectedDataQC['points']:
                 group_barcodes = [d['customdata'] for d in
@@ -101,7 +99,7 @@ class DifferentialExpression(SubsetBase):
                 unselected_barcodes = [b for b in group_barcodes if
                                        b not in selected_barcodes]
                 selected_barcodes = list(selected_barcodes)
-                diff_stats = diff_exp(log_counts, selected_barcodes,
+                diff_stats = diff_exp(counts, selected_barcodes,
                                       unselected_barcodes)
 
                 # Bonferroni cutoff
@@ -123,12 +121,12 @@ class DifferentialExpression(SubsetBase):
                     }
 
                 x1 = np.concatenate(
-                    [log_counts.loc[selected_barcodes, g] for g in
+                    [counts.loc[selected_barcodes, g] for g in
                      genes_to_show])
                 y1 = np.concatenate(
                     [[g] * len(selected_barcodes) for g in genes_to_show])
                 x2 = np.concatenate(
-                    [log_counts.loc[unselected_barcodes, g] for g in
+                    [counts.loc[unselected_barcodes, g] for g in
                      genes_to_show])
                 y2 = np.concatenate(
                     [[g] * len(unselected_barcodes) for g in genes_to_show])
@@ -149,10 +147,10 @@ class DifferentialExpression(SubsetBase):
                                         )
                 }
             else:
-                genes_to_show = log_counts.mean().nlargest(5).index
+                genes_to_show = counts.mean().nlargest(5).index
 
                 x1 = np.concatenate(
-                    [log_counts.loc[group_barcodes, g] for g in genes_to_show])
+                    [counts.loc[group_barcodes, g] for g in genes_to_show])
                 y1 = np.concatenate(
                     [[g] * len(group_barcodes) for g in genes_to_show])
 
