@@ -420,7 +420,8 @@ class TenX_Runs(Plates):
                                                 index_col=0, nrows=nrows)
 
         if tissue is not None:
-            folders = self.plate_metadata.index[self.plate_metadata['Tissue'] == tissue]
+            tissues = tissue.split(',')
+            folders = self.plate_metadata.index[self.plate_metadata['Tissue'].isin(tissues)]
 
         else:
             folders = self.plate_metadata.index
