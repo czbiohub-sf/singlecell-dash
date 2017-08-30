@@ -124,11 +124,12 @@ class SmushedPlot(SubsetBase):
                         scatters.append(scatter)
             else:
                 for cluster, df in smushed.groupby('cluster'):
+                    name = 'cluster ' + str(cluster) if not selected_gene else None
                     scatter = self._scatter(df, color=log_gene_data,
                                             showscale=bool(selected_gene),
                                             colorbar_title='log10 KPM',
                                             data_type='expression',
-                                            name='cluster ' + str(cluster),
+                                            name=name,
                                             text=hovertext.loc[df.index].values,
                                             customdata=df.index,
                                             opacity=alpha.loc[df.index])
