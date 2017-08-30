@@ -44,7 +44,6 @@ class HandlerCircle(HandlerPatch):
 
 def plot_labelprop_mpl(coords, communities, file_name=None, title=''):
     u_community = np.unique(communities)
-    n_communities = len(u_community)
 
     cmap = matplotlib.cm.tab20
     cmap.set_over('black')
@@ -69,6 +68,38 @@ def plot_labelprop_mpl(coords, communities, file_name=None, title=''):
 
     if file_name:
         FigureCanvasAgg(fig).print_figure(file_name)
+
+
+
+def plot_labelprop_mpl_tissues(coords, tissue_list, file_name=None, title=''):
+    u_tissue = set(tissue_list)
+
+    tissue_d = {t:i for i,t in enumerate(u_tissue)}
+
+    cmap = matplotlib.cm.tab20
+    cmap.set_over('black')
+
+    ix = np.random.permutation(np.arange(coords.shape[0], dtype=int))
+    x = coords[ix, 0]
+    y = coords[ix, 1]
+
+    fig = matplotlib.figure.Figure(figsize=(12, 12))
+    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+
+    ax.scatter(x, y, s=60, alpha=0.8, linewidth=0,
+               color=[cmap(tissue_d[tissue_list[i]]) for i in ix])
+    ax.tick_params(left='off', labelleft='off', bottom='off', labelbottom='off')
+
+    ax.set_title(title)
+
+    lbl_rects = [(Circle((0, 0), 1, color=cmap(tissue_d[t])), t) for t in u_tissue]
+
+    fig.legend(*zip(*lbl_rects), **{'handler_map': {Circle: HandlerCircle()},
+                                    'loc': 7, 'fontsize': 'large'})
+
+    if file_name:
+        FigureCanvasAgg(fig).print_figure(file_name)
+
 
 
 def label_propagation(G, verbose=False):
@@ -271,10 +302,79 @@ def run_tissue(tissue, data_folder, samples, k):
     bigten.columns = ['Mean UMIs']
     bigten.to_csv(file_prefix + 'diff exp' + file_suffix + '.csv')
 
-if __name__ == '__main__':
-    for tissue in ['Kidney', 'Spleen', 'Heart', 'Marrow', 'Lung', 'Pancreas', 'Colon',
-       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder',
-       'Thymus', 'Mammary']:
 
-        run_tissue(tissue, '/data1/maca', samples=1000, k=25)
+
+
+def all_tissues(tissues, data_folder, samples, ks):
+    genes_to_drop = 'Malat1|Rn45s|Rpl10|Rpl10a|Rpl10l|Rpl11|Rpl12|Rpl13|Rpl13a|Rpl14|Rpl15|Rpl17|Rpl18|Rpl18a|Rpl19|Rpl21|Rpl22|Rpl22l1|Rpl23|Rpl23a|Rpl24|Rpl26|Rpl27|Rpl27a|Rpl28|Rpl29|Rpl3|Rpl30|Rpl31|Rpl31-ps12|Rpl32|Rpl34|Rpl34-ps1|Rpl35|Rpl35a|Rpl36|Rpl36a|Rpl36al|Rpl37|Rpl37a|Rpl38|Rpl39|Rpl39l|Rpl3l|Rpl4|Rpl41|Rpl5|Rpl6|Rpl7|Rpl7a|Rpl7l1|Rpl8|Rpl9|Rplp0|Rplp1|Rplp2|Rplp2-ps1|Rps10|Rps11|Rps12|Rps13|Rps14|Rps15|Rps15a|Rps15a-ps4|Rps15a-ps6|Rps16|Rps17|Rps18|Rps19|Rps19-ps3|Rps19bp1|Rps2|Rps20|Rps21|Rps23|Rps24|Rps25|Rps26|Rps27|Rps27a|Rps27l|Rps28|Rps29|Rps3|Rps3a|Rps4x|Rps4y2|Rps5|Rps6|Rps6ka1|Rps6ka2|Rps6ka3|Rps6ka4|Rps6ka5|Rps6ka6|Rps6kb1|Rps6kb2|Rps6kc1|Rps6kl1|Rps7|Rps8|Rps9|Rpsa'.split('|')
+
+    file_prefix = data_folder + '/10x_data/tissues/'
+
+    all_genes = sparse_dataframe.SparseDataFrame()
+    tissue_list = []
+
+    for tissue in tissues:
+        tenx = common.TenX_Runs(data_folder, tissue=tissue, verbose=True,
+                                genes_to_drop=genes_to_drop,
+                                channels_to_drop=['10X_P1_5', '10X_P1_6'])
+
+
+        skip = tenx.genes.matrix.shape[0] // samples
+        skip = max(skip, 1)
+        print(tenx.genes.matrix.shape, skip)
+
+        if all_genes.matrix is None:
+            all_genes.columns = tenx.genes.columns[:]
+            all_genes.rows = tenx.genes.rows[::skip]
+            all_genes.matrix = tenx.genes.matrix[::skip]
+        else:
+            all_genes.rows.extend(tenx.genes.rows[::skip])
+            all_genes.matrix = sparse.vstack((all_genes.matrix, tenx.genes.matrix[::skip]),
+                                             format='csc')
+
+        tissue_list.extend(tissue for i in range(0, tenx.genes.matrix.shape[0], skip))
+
+    print(all_genes.matrix.shape)
+
+    print(len(all_genes.rows))
+
+    for k in ks:
+        file_suffix = f'-all-{samples}-{k}'
+
+        coords, communities_labelprop = network_layout(all_genes.matrix, k=k)
+
+        coords_df = pd.DataFrame({'0': coords[:, 0],
+                                  '1': coords[:, 1],
+                                  'cluster': communities_labelprop},
+                                 index=all_genes.rows)
+
+        coords_df.to_csv(file_prefix + 'smushed' + file_suffix + '.csv')
+
+        plot_labelprop_mpl_tissues(coords, tissue_list, title='Graph layout of tissues',
+                           file_name=file_prefix + 'tissue-embedding' + file_suffix + '.png')
+
+        plot_labelprop_mpl(coords, communities_labelprop,
+                           title='Graph layout of clusters',
+                           file_name=file_prefix + 'embedding' + file_suffix + '.png')
+
+        diff_expr_df = tenx_diff_exp(all_genes.matrix,
+                                     all_genes.columns,
+                                     communities_labelprop)
+
+        de = diff_expr_df[diff_expr_df['p'] < 0.001]
+        de = de[de['z'] > 0]
+        de['scale'] = np.abs(de['mean1'] - de['mean2'])
+
+        bigten = de.groupby('community')['mean1'].nlargest(10)
+        bigten = pd.DataFrame(bigten)
+        bigten.columns = ['Mean UMIs']
+        bigten.to_csv(file_prefix + 'diff exp' + file_suffix + '.csv')
+
+
+
+if __name__ == '__main__':
+    tissues = ['Kidney', 'Spleen', 'Heart', 'Marrow', 'Lung', 'Pancreas', 'Colon',
+       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder']
+
+    all_tissues(tissues, '/Users/james.webber/Desktop', 100, ks=(10,25,50))
 

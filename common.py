@@ -417,11 +417,10 @@ class TenX_Runs(Plates):
 
         self.plate_metadata = combine_csv_files(run_folder,
                                                 'MACA_10X_P*.csv',
-                                                index_col=0, nrows=nrows)
+                                                index_col=0)
 
         if tissue is not None:
             folders = self.plate_metadata.index[self.plate_metadata['Tissue'] == tissue]
-
         else:
             folders = self.plate_metadata.index
 
