@@ -16,6 +16,7 @@ dependencies:
 - matplotlib
 - mkl
 - nbformat
+- networkx
 - numpy
 - openssl
 - pandas
@@ -48,6 +49,7 @@ dependencies:
   - dash_core_components>=0.11
   - dash-html-components>=0.6.2
   - dash-renderer>=0.7.3
+  - fastcluster
   - flask
   - flask-compress
   - flask-seasurf
