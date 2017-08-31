@@ -33,11 +33,17 @@ def sparse_diff_exp(matrix, group1, group2, index):
 
     Returns a dataframe of Z-scores and p-values."""
 
-    g1 = matrix[group1, :]
-    g2 = matrix[group2, :]
+    g1 = matrix[group1, :].tocsc()
+    g2 = matrix[group2, :].tocsc()
 
-    g1mu = np.asarray(g1.mean(0)).flatten()
-    g2mu = np.asarray(g2.mean(0)).flatten()
+    g1mu = np.zeros(g1.shape[1])
+    g2mu = np.zeros_like(g1mu)
+
+    nz1 = np.asarray((g1.max(axis=0) > 0).todense()).flatten()
+    nz2 = np.asarray((g2.max(axis=0) > 0).todense()).flatten()
+
+    g1mu[nz1] = np.asarray(g1[:,nz1].mean(0)).flatten()
+    g2mu[nz2] = np.asarray(g2[:,nz2].mean(0)).flatten()
 
     mean_diff = g1mu - g2mu
     # E[X^2] - (E[X])^2

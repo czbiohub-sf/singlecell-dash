@@ -32,7 +32,7 @@ def combine_sdf_files(run_folder, folders, verbose=False, **kwargs):
             combined.matrix = sdf.matrix
         else:
             combined.matrix = sparse.vstack((combined.matrix, sdf.matrix),
-                                            format='csc')
+                                            format='csr')
 
     assert len(columns) == 1
 

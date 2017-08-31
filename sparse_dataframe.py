@@ -47,7 +47,7 @@ class SparseDataFrame(object):
     @staticmethod
     def load_from_dataframe(df):
         """Convert a dense DataFrame to sparse form"""
-        matrix = scipy.sparse.csc_matrix(df.as_matrix(), dtype='int32')
+        matrix = scipy.sparse.csr_matrix(df.as_matrix(), dtype='int32')
         rows = [str(i) for i in df.index]
         columns = [str(i) for i in df.columns]
         return matrix, rows, columns
@@ -62,7 +62,7 @@ class SparseDataFrame(object):
 
     @staticmethod
     def load_from_npz(filename):
-        matrix = scipy.sparse.load_npz(filename)
+        matrix = scipy.sparse.load_npz(filename).tocsr()
         with open(SparseDataFrame._strip_npz(filename) + '.p', 'rb') as fp:
             d = pickle.load(fp)
             rows = d["rows"]
