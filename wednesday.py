@@ -374,15 +374,22 @@ def all_tissues(tissues, data_folder, samples, ks, channels_to_drop=[]):
 
 if __name__ == '__main__':
     tissues = ['Kidney', 'Spleen', 'Heart', 'Marrow', 'Lung', 'Pancreas', 'Colon',
-       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder', 'Mammary']
+       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder']
 
-    channels_to_drop = ['10X_P1_5', '10X_P1_6', '10X_P3_10', '10X_P3_11', '10X_P3_12']
+    channels_to_drop = ['10X_P1_1', '10X_P1_2', '10X_P1_3', '10X_P1_4', '10X_P1_5', '10X_P1_6',
+       '10X_P1_7', '10X_P1_8', '10X_P1_9', '10X_P1_10', '10X_P1_11',
+       '10X_P1_12', '10X_P1_13', '10X_P1_14', '10X_P1_15', '10X_P1_16',
+       '10X_P2_0', '10X_P2_1', '10X_P2_2', '10X_P2_3', '10X_P2_4', '10X_P2_5',
+       '10X_P2_6', '10X_P2_7', '10X_P2_8', '10X_P2_9', '10X_P2_10',
+       '10X_P2_11', '10X_P2_12', '10X_P2_13', '10X_P2_14', '10X_P2_15',
+       '10X_P3_0', '10X_P3_1', '10X_P3_2', '10X_P3_3', '10X_P3_4', '10X_P3_5',
+       '10X_P3_6', '10X_P3_7', '10X_P3_8', '10X_P3_9']
 
     import sys
     for tissue in tissues:
         print(f'Processing {tissue}...')
         run_tissue(tissue, '/data1/maca', samples = int(sys.argv[1]), k = 25, channels_to_drop=channels_to_drop)
 
-    #all_tissues(tissues, '/Users/james.webber/Desktop', 100, ks=(10,25,50), channels_to_drop=channels_to_drop)
+    all_tissues(tissues, '/data1/maca', 500, ks=(25,50), channels_to_drop=channels_to_drop)
 
 
