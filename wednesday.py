@@ -297,7 +297,7 @@ def run_tissue(tissue, data_folder, samples, k, channels_to_drop = []):
     de = diff_expr_df[diff_expr_df['p'] < 0.001]
     de = de[de['z'] > 0]
     de['scale'] = np.abs(de['mean1'] - de['mean2'])
-    bigten = de.groupby('community')['mean1'].nlargest(10)
+    bigten = de.groupby('community')['mean1'].nlargest(50)
     bigten = pd.DataFrame(bigten)
     bigten.columns = ['Mean UMIs']
     bigten.to_csv(file_prefix + 'diff exp' + file_suffix + '.csv')
@@ -365,7 +365,7 @@ def all_tissues(tissues, data_folder, samples, ks, channels_to_drop=[]):
         de = de[de['z'] > 0]
         de['scale'] = np.abs(de['mean1'] - de['mean2'])
 
-        bigten = de.groupby('community')['mean1'].nlargest(10)
+        bigten = de.groupby('community')['mean1'].nlargest(50)
         bigten = pd.DataFrame(bigten)
         bigten.columns = ['Mean UMIs']
         bigten.to_csv(file_prefix + 'diff exp' + file_suffix + '.csv')
@@ -373,8 +373,8 @@ def all_tissues(tissues, data_folder, samples, ks, channels_to_drop=[]):
 
 
 if __name__ == '__main__':
-    tissues = ['Kidney', 'Spleen', 'Heart', 'Marrow', 'Lung', 'Pancreas', 'Colon',
-       'Brain', 'Liver', 'Muscle', 'Fat', 'Blood', 'Tongue', 'Bladder']
+    tissues = ['Tongue', 'Liver', 'Bladder', 'Kidney', 'Spleen', 'Marrow', 'Lung',
+       'Muscle', 'Heart'] #, 'Thymus', 'Mammary']
 
     channels_to_drop = ['10X_P1_1', '10X_P1_2', '10X_P1_3', '10X_P1_4', '10X_P1_5', '10X_P1_6',
        '10X_P1_7', '10X_P1_8', '10X_P1_9', '10X_P1_10', '10X_P1_11',
