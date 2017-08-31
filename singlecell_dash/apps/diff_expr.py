@@ -148,7 +148,7 @@ class DifferentialExpression(SubsetBase):
 
             # if the plate changed without updating the TSNE selection somehow,
             # this will be empty
-            if selectedDataTSNE is not None:
+            if selected_barcodes:
                 unselected_barcodes = [b for b in group_barcodes if
                                        b not in selected_barcodes]
                 selected_barcodes = list(selected_barcodes)
@@ -156,7 +156,7 @@ class DifferentialExpression(SubsetBase):
                                              unselected_barcodes,
                                              self.counts.columns)
 
-                p_cutoff = diff_stats['p'] < (0.001)
+                p_cutoff = diff_stats['p'] < 0.001
                 diff = diff_stats[p_cutoff]['mean1'] - diff_stats[p_cutoff]['mean2']
 
                 if difference_type == "High Expression":
