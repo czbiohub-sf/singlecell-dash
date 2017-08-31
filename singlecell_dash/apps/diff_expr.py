@@ -207,8 +207,8 @@ class DifferentialExpression(SubsetBase):
                     "data": [],
                     "layout": go.Layout(
                         title="Select cells to see differential expression",
-                                        xaxis={'title': self.XAXIS_TITLE},
-                                        yaxis={'title': self.YAXIS_TITLE},
+                                        # xaxis={'title': self.XAXIS_TITLE},
+                                        # yaxis={'title': self.YAXIS_TITLE},
                                         ),
                 }
 

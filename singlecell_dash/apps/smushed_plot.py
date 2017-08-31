@@ -128,22 +128,33 @@ class SmushedPlot(SubsetBase):
                 cmap = matplotlib.cm.tab20
                 cmap.set_over('black')
 
-                for i, (cluster, df) in enumerate(smushed.groupby('cluster')):
-                    name = 'cluster ' + str(cluster) \
-                        if not selected_gene else None
-                    color = log_gene_data.loc[df.index] if \
-                        selected_gene else rgb2hex(cmap(i))
-
-                    text = hovertext.loc[df.index] + f' (cluster {cluster})'
-                    scatter = self._scatter(df, color=color,
+                # import pdb; pdb.set_trace()
+                if selected_gene:
+                    scatter = self._scatter(smushed, color=log_gene_data,
                                             showscale=bool(selected_gene),
                                             colorbar_title='log10 KPM',
                                             data_type='expression',
-                                            name=name,
-                                            text=text.values,
-                                            customdata=df.index,
-                                            opacity=alpha.loc[df.index])
+                                            text=hovertext.values,
+                                            customdata=smushed.index,
+                                            opacity=alpha)
                     scatters.append(scatter)
+                else:
+                    for i, (cluster, df) in enumerate(smushed.groupby('cluster')):
+                        name = 'cluster ' + str(cluster) \
+                            if not selected_gene else None
+                        color = log_gene_data.loc[df.index] if \
+                            selected_gene else rgb2hex(cmap(i))
+
+                        text = hovertext.loc[df.index] + f' (cluster {cluster})'
+                        scatter = self._scatter(df, color=color,
+                                                showscale=bool(selected_gene),
+                                                colorbar_title='log10 KPM',
+                                                data_type='expression',
+                                                name=name,
+                                                text=text.values,
+                                                customdata=df.index,
+                                                opacity=alpha.loc[df.index])
+                        scatters.append(scatter)
 
             return {
                 "data": scatters,
