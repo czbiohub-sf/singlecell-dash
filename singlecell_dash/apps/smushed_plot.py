@@ -83,6 +83,7 @@ class SmushedPlot(SubsetBase):
 
             if selected_gene and not selected_metadata:
                 group_barcodes = self._get_dropdown_barcodes(group_name)
+                smushed = smushed.loc[group_barcodes]
 
                 data = np.ravel(self.counts[group_barcodes,
                                             selected_gene].todense())
@@ -142,8 +143,7 @@ class SmushedPlot(SubsetBase):
                     for i, (cluster, df) in enumerate(smushed.groupby('cluster')):
                         name = 'cluster ' + str(cluster) \
                             if not selected_gene else None
-                        color = log_gene_data.loc[df.index] if \
-                            selected_gene else rgb2hex(cmap(i))
+                        color = rgb2hex(cmap(i))
 
                         text = hovertext.loc[df.index] + f' (cluster {cluster})'
                         scatter = self._scatter(df, color=color,

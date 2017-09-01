@@ -26,6 +26,8 @@ from singlecell_dash.app import run_singlecell_dash
 @click.option('--subset', default=None,
               help="Value in metadata's --dropdown-col to use to on a small "
                    "portion of data")
+@click.option('--smushed-folder', default='tissues',
+              help="Folder in data_folder to look for smushed data")
 @click.option('--javascript',
               help="Location of an arbitrary javacsript file you want to add"
                    " to the Dash app", default=None)
@@ -33,7 +35,7 @@ from singlecell_dash.app import run_singlecell_dash
               is_flag=True)
 @click.version_option(version='v0.1.0')
 def cli(data_folder, metadata, genes_to_drop, verbose, port, host,
-        dropdown_col, subset, javascript, debug):
+        dropdown_col, subset, smushed_folder, javascript, debug):
     """Run a dashboard showing sequencing QC of single-cell RNA-seq plates"""
     # plates = Plates(data_folder, metadata, genes_to_drop=genes_to_drop,
     #                 verbose=verbose)
@@ -44,7 +46,8 @@ def cli(data_folder, metadata, genes_to_drop, verbose, port, host,
                           verbose=verbose, nrows=nrows, tissue=subset,
                           channels_to_drop=['10X_P1_5', '10X_P1_6',
                                             '10X_P3_10', '10X_P3_11',
-                                            '10X_P3_12'])
+                                            '10X_P3_12'],
+                          tissue_folder=smushed_folder)
 
     app = run_singlecell_dash(cell_metadata=tenx_runs.cell_metadata,
                               counts=tenx_runs.genes,

@@ -411,7 +411,8 @@ class TenX_Runs(Plates):
                           'Fraction Reads in Cells'}
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
-                 verbose=False, nrows=None, tissue=None, channels_to_drop=[]):
+                 verbose=False, nrows=None, tissue=None,
+                 channels_to_drop=[], tissue_folder='tissues'):
 
         run_folder = os.path.join(data_folder, '10x_data')
 
@@ -446,12 +447,12 @@ class TenX_Runs(Plates):
         self.cell_metadata = self.cell_metadata.join(self.plate_metadata,
                                                      on=self.SAMPLE_MAPPING)
 
-        smushed_folder = os.path.join(run_folder, 'tissues')
+        smushed_folder = os.path.join(run_folder, tissue_folder)
 
         if not os.path.exists(smushed_folder):
             os.mkdir(smushed_folder)
 
-        self.cell_smushed = self.read_tissue_smushed(smushed_folder)
+        self.cell_smushed = self.read_tissue_smushed(smushed_folder, verbose)
 
         self.gene_names = sorted(self.genes.columns)
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
@@ -606,10 +607,12 @@ class TenX_Runs(Plates):
 
         return plate_summaries
 
-    def read_tissue_smushed(self, folder):
+    def read_tissue_smushed(self, folder, verbose=False):
         smusheds = {}
         glob.glob(os.path.join(folder, 'smushed-*'))
         for filename in glob.iglob(os.path.join(folder, 'smushed-*')):
+            if verbose:
+                print(f'Reading {filename} ...')
             tissue = filename.split('smushed-')[-1].split('.')[0]
             tissue = tissue.split('-')[0]
             df = pd.read_csv(filename, index_col=0)
