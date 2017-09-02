@@ -284,14 +284,16 @@ if __name__ == '__main__':
     if args.tissues is None:
         args.tissues = all_tissues
 
-    for tissue in args.tissues[2:3]:
+    for tissue in args.tissues:
         print(f'Processing {tissue}...')
         tenx = load_tissue(tissue, args.data_folder,
                            channels_to_use=channels_to_use)
 
 
-        if not os.path.exists(f'{args.data_folder}/10x_data/tissues/{tissue}'):
-            os.mkdir(f'{args.data_folder}/10x_data/tissues/{tissue}')
+        if not os.path.exists(os.path.join(f'{args.data_folder}',
+                                           '10x_data', 'tissues', tissue)):
+            os.mkdir(os.path.join(f'{args.data_folder}',
+                                  '10x_data', 'tissues', tissue))
 
         if args.n_samples < 1:
             skip = 1
