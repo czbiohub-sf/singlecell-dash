@@ -235,7 +235,7 @@ def diff_exp_clusters(cluster_expression_df, cluster_sizes, file_format):
             right_child = rd[i].get_right()
             right_clusters = (right_child.pre_order(lambda x: x.id))
 
-            # don't calculate this if it's redundant with a 1-vs-all comp
+            # don't calculate if it's redundant with a 1-vs-all comp
             if i == 2 * n_clusters - 2 and (len(left_clusters) == 1
                                             or len(right_clusters) == 1):
                 continue
@@ -245,6 +245,11 @@ def diff_exp_clusters(cluster_expression_df, cluster_sizes, file_format):
         if i < 2 * n_clusters - 2:
             below = rd[i].pre_order(lambda x: x.id)
             above = [j for j in range(len(cluster_sizes)) if j not in below]
+
+            # don't calculate redundant comparison
+            if len(above) == 1:
+                continue
+
             de(i, 'all', below, above)
 
     group_list = [(i, rd[i].pre_order(lambda x: x.id))
