@@ -502,11 +502,12 @@ if __name__ == '__main__':
             skip = 1
 
         file_suffix = f'-{tissue}-{samples}-{k}'
-        os.mkdir(f'{data_folder}/10x_data/tissues/{tissue}')
+        if not os.path.exists(f'{data_folder}/10x_data/tissues/{tissue}'):
+            os.mkdir(f'{data_folder}/10x_data/tissues/{tissue}')
         file_format = data_folder + '/10x_data/tissues/' + tissue + '/{}' + file_suffix + '.{}'
 
         if samples < 1:
-            file_format = data_folder + '/10x_data/tissues/' + tissue + '{}' + '.{}'
+            file_format = data_folder + '/10x_data/tissues/' + tissue + '/{}' + '.{}'
 
         clusters = cluster(tenx, skip, file_format=file_format, k=k, tissue=tissue)
 
