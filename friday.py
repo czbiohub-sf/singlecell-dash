@@ -91,7 +91,7 @@ def label_propagation(G, verbose=False):
 
 def network_layout(matrix, k=30):
     nbrs = NearestNeighbors(k, algorithm='brute',
-                            metric='cosine', n_jobs=-1).fit(matrix)
+                            metric='cosine').fit(matrix)
     G = networkx.from_scipy_sparse_matrix(nbrs.kneighbors_graph(matrix))
 
     node_labels = label_propagation(G, verbose=True)
