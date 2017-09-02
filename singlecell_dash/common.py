@@ -412,7 +412,7 @@ class TenX_Runs(Plates):
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
                  verbose=False, nrows=None, tissue=None,
-                 channels_to_use=[], tissue_folder='tissues'):
+                 channels_to_use=None, tissue_folder='tissues'):
 
         run_folder = os.path.join(data_folder, '10x_data')
 
@@ -428,7 +428,9 @@ class TenX_Runs(Plates):
             folders = self.plate_metadata.index
 
         folders = [f for f in folders if os.path.exists(os.path.join(run_folder, f))]
-        folders = [f for f in folders if f in channels_to_use]
+
+        if channels_to_use is not None:
+            folders = [f for f in folders if f in channels_to_use]
 
         counts = combine_sdf_files(run_folder, folders,
                                    verbose=verbose)

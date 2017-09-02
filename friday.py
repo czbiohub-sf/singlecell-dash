@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt # necessary?
 import scipy.spatial.distance as sdist
 import scipy.stats as stats
 import scipy.sparse as sparse
+import scipy.cluster.hierarchy
 
 from sklearn.neighbors import NearestNeighbors, kneighbors_graph
 
@@ -282,7 +283,7 @@ def sparse_diff_exp(matrix, group1, group2, index):
 
     return df
 
-def load_tissue(tissue, data_folder, channels_to_use = []):
+def load_tissue(tissue, data_folder, channels_to_use = None):
 
     genes_to_drop = 'Malat1|Rn45s|Rpl10|Rpl10a|Rpl10l|Rpl11|Rpl12|Rpl13|Rpl13a|Rpl14|Rpl15|Rpl17|Rpl18|Rpl18a|Rpl19|Rpl21|Rpl22|Rpl22l1|Rpl23|Rpl23a|Rpl24|Rpl26|Rpl27|Rpl27a|Rpl28|Rpl29|Rpl3|Rpl30|Rpl31|Rpl31-ps12|Rpl32|Rpl34|Rpl34-ps1|Rpl35|Rpl35a|Rpl36|Rpl36a|Rpl36al|Rpl37|Rpl37a|Rpl38|Rpl39|Rpl39l|Rpl3l|Rpl4|Rpl41|Rpl5|Rpl6|Rpl7|Rpl7a|Rpl7l1|Rpl8|Rpl9|Rplp0|Rplp1|Rplp2|Rplp2-ps1|Rps10|Rps11|Rps12|Rps13|Rps14|Rps15|Rps15a|Rps15a-ps4|Rps15a-ps6|Rps16|Rps17|Rps18|Rps19|Rps19-ps3|Rps19bp1|Rps2|Rps20|Rps21|Rps23|Rps24|Rps25|Rps26|Rps27|Rps27a|Rps27l|Rps28|Rps29|Rps3|Rps3a|Rps4x|Rps4y2|Rps5|Rps6|Rps6ka1|Rps6ka2|Rps6ka3|Rps6ka4|Rps6ka5|Rps6ka6|Rps6kb1|Rps6kb2|Rps6kc1|Rps6kl1|Rps7|Rps8|Rps9|Rpsa'.split(
         '|')
@@ -292,7 +293,7 @@ def load_tissue(tissue, data_folder, channels_to_use = []):
 
     return tenx
 
-def cluster(tenx, skip, file_format, k):
+def cluster(tenx, skip, file_format, k, tissue):
 
     coords, communities_labelprop = network_layout(tenx.genes.matrix[::skip], k=k)
 
@@ -310,36 +311,78 @@ def cluster(tenx, skip, file_format, k):
 
 
 
-def diff_exp_clusters(cluster_expression_df, file_name):
+def diff_exp_clusters(cluster_expression_df, cluster_sizes, file_format):
+    cluster_sizes_dict = dict(cluster_sizes)
+
+    cluster_sum_umi = np.vstack([size*cluster_expression_df[f'Cluster {c} mean UMI'].values
+                                 for c, size in cluster_sizes])
+
+    cluster_ssq_umi = np.vstack([size*(
+                                     cluster_expression_df[f'Cluster {c} std UMI'].values**2 +
+                                     cluster_expression_df[f'Cluster {c} mean UMI'].values**2)
+                                 for c, size in cluster_sizes])
+
+    Z = fastcluster.linkage(cluster_sum_umi, method='average', metric='cosine')
+
+    scipy.cluster.hierarchy.dendrogram(Z)
+    plt.savefig(file_format.format('dendrogram','png'))
+
+    root, rd = scipy.cluster.hierarchy.to_tree(Z, rd=True)
+
+    def de(group1, group2):
+        print(f'Comparing {group1} to {group2}')
+
+        left_n_cells = sum(cluster_sizes_dict[c] for c in group1)
+        right_n_cells = sum(cluster_sizes_dict[c] for c in group2)
+
+        left_mean = cluster_sum_umi[group1, :].sum(axis=0) / left_n_cells
+        right_mean = cluster_sum_umi[group2, :].sum(axis=0) / right_n_cells
+
+        mean_diff = left_mean - right_mean
+
+        # here is where things went wrong
+
+        left_var = cluster_ssq_umi[group1, :].sum(axis=0) / left_n_cells - left_mean ** 2
+        right_var = cluster_ssq_umi[group2, :].sum(axis=0) / right_n_cells - right_mean ** 2
+
+        pooled_sd = np.sqrt(left_var / left_n_cells + right_var / right_n_cells)
+
+        z_scores = np.zeros_like(pooled_sd)
+        nz = pooled_sd > 0
+        z_scores[nz] = np.nan_to_num(mean_diff[nz] / pooled_sd[nz])
+
+        # t-test
+        p_vals = np.clip((1 - stats.norm.cdf(np.abs(z_scores))) * 2 * z_scores.shape[0], 0, 1)
+
+        df = pd.DataFrame(OrderedDict([('z', z_scores), ('p', p_vals),
+                                       ('left_mean', left_mean), ('right_mean', right_mean)]),
+                          index=cluster_expression_df.index)
+
+        df = df[df['p'] < 0.001]
+        df['diff'] = df['left_mean'] - df['right_mean']
+
+        df.sort_values('diff', ascending=False, inplace=True)
+        # df.drop('scale', axis=1, inplace=True)
+
+        name = 'dge_' + '-'.join(map(str, group1)) + '_vs_' + '-'.join(map(str, group2))
+        df.to_csv(file_format.format(name, 'csv'))
+        
+
+    for i in range(len(cluster_sizes), 2*len(cluster_sizes)-1):
+        left_clusters = (rd[i].get_left().pre_order(lambda x: x.id))
+
+        right_clusters = (rd[i].get_right().pre_order(lambda x: x.id))
+        de(left_clusters, right_clusters)
+
+    for i in range(0, 2 * len(cluster_sizes) - 2):
+
+        below = rd[i].pre_order(lambda x: x.id)
+        above = [j for j in range(len(cluster_sizes)) if j not in below]
+
+        de(below, above)
 
 
-    for col in cluster_expression_df.columns:
-
-    df[f'Cluster {c} mean UMI'] = mu
-    df[f'Cluster {c} std UMI'] = std
-    df[f'Cluster {c} % present'] = percent_nz
-    downsampled = tenx.genes[::skip,:]
-
-    cluster_names = np.unique(clusters)
-    for c in cluster_names:
-
-    diff_expr_df = tenx_diff_exp(tenx.genes[::skip, :], tenx.genes.columns, clusters)
-
-
-
-    de = diff_expr_df[diff_expr_df['p'] < 0.001]
-    de = de[de['z'] > 0]
-    de['scale'] = np.abs(de['mean1'] - de['mean2'])
-
-    bigten = de.groupby('community')['mean1'].nlargest(50)
-    bigten = pd.DataFrame(bigten)
-    bigten.columns = ['Mean UMIs']
-
-    file_name = file_format.format('diff-exp', 'csv')
-    bigten.to_csv(file_name)
-
-
-def all_tissues(tissues, data_folder, samples, ks, channels_to_use=[]):
+def all_tissues(tissues, data_folder, samples, ks, channels_to_use=None):
     genes_to_drop = 'Malat1|Rn45s|Rpl10|Rpl10a|Rpl10l|Rpl11|Rpl12|Rpl13|Rpl13a|Rpl14|Rpl15|Rpl17|Rpl18|Rpl18a|Rpl19|Rpl21|Rpl22|Rpl22l1|Rpl23|Rpl23a|Rpl24|Rpl26|Rpl27|Rpl27a|Rpl28|Rpl29|Rpl3|Rpl30|Rpl31|Rpl31-ps12|Rpl32|Rpl34|Rpl34-ps1|Rpl35|Rpl35a|Rpl36|Rpl36a|Rpl36al|Rpl37|Rpl37a|Rpl38|Rpl39|Rpl39l|Rpl3l|Rpl4|Rpl41|Rpl5|Rpl6|Rpl7|Rpl7a|Rpl7l1|Rpl8|Rpl9|Rplp0|Rplp1|Rplp2|Rplp2-ps1|Rps10|Rps11|Rps12|Rps13|Rps14|Rps15|Rps15a|Rps15a-ps4|Rps15a-ps6|Rps16|Rps17|Rps18|Rps19|Rps19-ps3|Rps19bp1|Rps2|Rps20|Rps21|Rps23|Rps24|Rps25|Rps26|Rps27|Rps27a|Rps27l|Rps28|Rps29|Rps3|Rps3a|Rps4x|Rps4y2|Rps5|Rps6|Rps6ka1|Rps6ka2|Rps6ka3|Rps6ka4|Rps6ka5|Rps6ka6|Rps6kb1|Rps6kb2|Rps6kc1|Rps6kl1|Rps7|Rps8|Rps9|Rpsa'.split('|')
 
     file_prefix = data_folder + '/10x_data/tissues/'
@@ -445,6 +488,7 @@ if __name__ == '__main__':
 
     import sys
     for tissue in tissues[6:7]:
+        tissue = 'Mammary'
         print(f'Processing {tissue}...')
         samples = int(sys.argv[1])
         k = 25
@@ -458,18 +502,27 @@ if __name__ == '__main__':
             skip = 1
 
         file_suffix = f'-{tissue}-{samples}-{k}'
-        file_format = data_folder + '/10x_data/tissues/{}' + file_suffix + '.{}'
+        os.mkdir(f'{data_folder}/10x_data/tissues/{tissue}')
+        file_format = data_folder + '/10x_data/tissues/' + tissue + '/{}' + file_suffix + '.{}'
 
-        clusters = cluster(tenx, skip, file_format=file_format, k=k)
+        if samples < 1:
+            file_format = data_folder + '/10x_data/tissues/' + tissue + '{}' + '.{}'
 
+        clusters = cluster(tenx, skip, file_format=file_format, k=k, tissue=tissue)
+
+        print('Computing cluster expression.')
         cluster_expression_df = cluster_expression(tenx, clusters, skip)
         cluster_expression_df = cluster_expression_df.loc[cluster_expression_df.max(axis=1) != 0]
         cluster_expression_df = np.round(cluster_expression_df, 2)
 
+        #cluster_expression_df.to_csv(data_folder + f'/10x_data/tissues/{tissue}-cluster-expression.csv')
+
         cluster_sizes = Counter(clusters).most_common()
+        pd
 
+        print('Computing differential expression.')
 
-        cluster_expression_df.to_csv(data_folder + f'/10x_data/tissues/{tissue}-cluster-expression.csv')
+        diff_exp_clusters(cluster_expression_df, cluster_sizes, file_format)
         #diff_exp_clusters(tenx, skip, clusters, file_format)
 
     #all_tissues(tissues, '/data1/maca', 500, ks=(25,50), channels_to_use=channels_to_use)
