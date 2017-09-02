@@ -337,7 +337,8 @@ if __name__ == '__main__':
                     sum(cluster_sizes.values()), len(cluster_sizes)),
                   file=OUT)
             print('\t'.join(('group', 'n_cells', 'member_clusters')), file=OUT)
-            for i,gl in group_list:
+            for i,gl in group_list[:-1]:
                 print('{}\t{}\t{}'.format(i, sum(cluster_sizes[j] for j in gl),
                                           ', '.join(map(str, sorted(gl)))),
                       file=OUT)
+            print('total\t{}'.format(sum(cluster_sizes.values())), file=OUT)
