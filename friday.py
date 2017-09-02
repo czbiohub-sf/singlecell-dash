@@ -339,4 +339,5 @@ if __name__ == '__main__':
             print('\t'.join(('group', 'n_cells', 'member_clusters')), file=OUT)
             for i,gl in group_list:
                 print('{}\t{}\t{}'.format(i, sum(cluster_sizes[j] for j in gl),
-                                          ', '.join(map(str, gl))), file=OUT)
+                                          ', '.join(map(str, sorted(gl)))),
+                      file=OUT)
