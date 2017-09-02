@@ -323,7 +323,7 @@ if __name__ == '__main__':
 
         # round for readability and output to csv
         cluster_expression_df = np.round(cluster_expression_df, 2)
-        cluster_expression_df.to_csv(file_format.format('cluster-expresion', 'csv'))
+        cluster_expression_df.to_csv(file_format.format('cluster-expression', 'csv'))
 
         cluster_sizes = dict(Counter(clusters).most_common())
 
