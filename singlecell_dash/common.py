@@ -454,7 +454,8 @@ class TenX_Runs(Plates):
         if not os.path.exists(smushed_folder):
             os.mkdir(smushed_folder)
 
-        self.cell_smushed = self.read_tissue_smushed(smushed_folder, verbose)
+        self.cell_smushed = self.read_tissue_smushed(smushed_folder, verbose,
+                                                     tissue)
 
         self.gene_names = sorted(self.genes.columns)
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
@@ -609,10 +610,15 @@ class TenX_Runs(Plates):
 
         return plate_summaries
 
-    def read_tissue_smushed(self, folder, verbose=False):
+    def read_tissue_smushed(self, folder, verbose=False, tissue=None):
         smusheds = {}
-        glob.glob(os.path.join(folder, 'smushed-*'))
-        for filename in glob.iglob(os.path.join(folder, 'smushed-*')):
+
+        if tissue is None:
+            globber = glob.iglob(os.path.join(folder, 'smushed-*'))
+        else:
+            globber = glob.iglob(os.path.join(folder, f'smushed-{tissue}*'))
+
+        for filename in globber:
             if verbose:
                 print(f'Reading {filename} ...')
             tissue = filename.split('smushed-')[-1].split('.')[0]
