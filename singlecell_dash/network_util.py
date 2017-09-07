@@ -132,21 +132,36 @@ class HandlerCircle(HandlerPatch):
         return [p]
 
 
-def plot_labelprop(coords_df:pd.DataFrame, Z,
-                   color_by='cluster', file_name=None):
-    unique_clusters = np.unique(coords_df[color_by])
+def plot_labelprop(coords_df:pd.DataFrame, Z, color_by,
+                   cmap=None, file_name=None, **scatter_kwargs):
+    unique_clusters = np.unique(color_by)
 
-    cmap = matplotlib.cm.tab20
-    cmap.set_over('black')
+    default_kwargs = dict(s=40, alpha=0.8, linewidth=0)
+    default_kwargs.update(scatter_kwargs)
+
+    if len(unique_clusters) < 30:
+        discrete_data = True
+        norm = matplotlib.colors.NoNorm()
+
+        if cmap is None:
+            cmap = matplotlib.cm.tab20
+            cmap.set_over('black')
+    else:
+        discrete_data = False
+        norm = matplotlib.colors.Normalize(*np.percentile(color_by, (1., 99.)))
+
+        if cmap is None:
+            cmap = matplotlib.cm.viridis_r
 
     # no particular reason to this if the coords aren't sorted by cluster
     ix = np.random.permutation(np.arange(coords_df.shape[0], dtype=int))
     coords2 = coords_df.iloc[ix]
+    color_by2 = color_by[ix]
 
     fig,ax = plt.subplots(1, 2, figsize=(18,6), gridspec_kw={'wspace': 0.05})
 
-    ax[0].scatter(coords2['0'], coords2['1'], s=60, alpha=0.8, linewidth=0,
-                  color=cmap(coords2[color_by]))
+    ax[0].scatter(coords2['0'], coords2['1'], color=cmap(norm(color_by2)),
+                  **default_kwargs)
     ax[0].tick_params(left='off', labelleft='off', bottom='off', labelbottom='off')
 
     ax[0].set_title('Network Layout')
@@ -169,11 +184,13 @@ def plot_labelprop(coords_df:pd.DataFrame, Z,
     for s in ('top', 'bottom', 'left', 'right'):
         ax[1].spines[s].set_visible(False)
 
-    lbl_rects = [(Circle((0, 0), 1, color=cmap(c)), c)
-                 for c in unique_clusters]
+    if discrete_data:
+        lbl_rects = [(Circle((0, 0), 1, color=cmap(c)), c)
+                     for c in unique_clusters]
 
-    fig.legend(*zip(*lbl_rects), **{'handler_map': {Circle: HandlerCircle()},
-                                    'loc': 7, 'fontsize': 'large'})
+        fig.legend(*zip(*lbl_rects), **{'handler_map': {Circle: HandlerCircle()},
+                                        'loc'        : 7, 'fontsize': 'large'})
+
 
     if file_name:
         plt.savefig(file_name)
