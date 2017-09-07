@@ -459,14 +459,6 @@ class TenX_Runs(Plates):
         self.cell_metadata = self.cell_metadata.join(self.plate_metadata,
                                                      on=self.SAMPLE_MAPPING)
 
-        smushed_folder = os.path.join(run_folder, tissue_folder)
-
-        if not os.path.exists(smushed_folder):
-            os.mkdir(smushed_folder)
-
-        self.cell_smushed = self.read_tissue_smushed(smushed_folder, verbose,
-                                                     tissue)
-
         self.gene_names = sorted(self.genes.columns)
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
 
@@ -572,7 +564,8 @@ class TenX_Runs(Plates):
 
         counts.index = sample_ids
 
-        no_counts = np.asarray(counts.matrix.tocsc().max(axis=0) == 0).flatten()
+        no_counts = np.asarray(
+                counts.matrix.tocsc().max(axis=0).todense() == 0).flatten()
 
         # Separate spike-ins (ERCCs) and genes
         ercc_names = [col for col in counts.columns if col.startswith('ERCC-')]

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import scipy.cluster.hierarchy
 import scipy.stats as stats
+import seaborn as sns
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.legend_handler import HandlerPatch
@@ -36,112 +37,13 @@ AGE_3M_SAMPLES = {'10X_P4_0', '10X_P4_1', '10X_P4_2', '10X_P4_3',
                   '10X_P7_12', '10X_P7_13', '10X_P7_14', '10X_P7_15'}
 
 
-class HandlerCircle(HandlerPatch):
-    def create_artists(self, legend, orig_handle,
-                       xdescent, ydescent, width, height, fontsize, trans):
-        center = 0.5 * width - 0.5 * xdescent, 0.5 * height - 0.5 * ydescent
-        p = Circle(xy=center, radius=width / 4.0, alpha=0.4)
-        self.update_prop(p, orig_handle, legend)
-        p.set_transform(trans)
-        return [p]
-
-
-def plot_labelprop_mpl(coords, communities, file_name=None, title=''):
-    u_community = np.unique(communities)
-
-    cmap = matplotlib.cm.tab20
-    cmap.set_over('black')
-
-    ix = np.random.permutation(np.arange(coords.shape[0], dtype=int))
-    x = coords[ix, 0]
-    y = coords[ix, 1]
-
-    fig = matplotlib.figure.Figure(figsize=(12, 12))
-    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-
-    ax.scatter(x, y, s=60, alpha=0.8, linewidth=0,
-               color=cmap(communities[ix]))
-    ax.tick_params(left='off', labelleft='off', bottom='off', labelbottom='off')
-
-    ax.set_title(title)
-
-    lbl_rects = [(Circle((0, 0), 1, color=cmap(c)), c) for c in u_community]
-
-    fig.legend(*zip(*lbl_rects), **{'handler_map': {Circle: HandlerCircle()},
-                                    'loc': 7, 'fontsize': 'large'})
-
-    if file_name:
-        FigureCanvasAgg(fig).print_figure(file_name)
-
-
-
-def expression(matrix, group):
-    g = matrix[group,:].tocsc()
-    mu = np.asarray(g.mean(0)).flatten()
-    std = np.sqrt(np.asarray((g.power(2)).mean(0)).flatten() - mu ** 2)
-    percent_nz = 100*np.asarray((g > 0).mean(0)).flatten()
-
-    return mu, std, percent_nz
-
-
-def cluster_expression(tenx, clusters, skip=1):
-    df = pd.DataFrame(index=tenx.genes.columns)
-
-    for c in np.unique(clusters):
-        mu, std, percent_nz = expression(tenx.genes[::skip,:], clusters == c)
-        df[f'Cluster {c} mean UMI'] = mu
-        df[f'Cluster {c} std UMI'] = std
-        df[f'Cluster {c} % present'] = percent_nz
-
-    return df
-
-
-
-def cluster(tenx, skip, file_format, k, tissue):
-
-    coords, communities_labelprop = network_layout(tenx.genes.matrix[::skip], k=k)
-
-    coords_df = pd.DataFrame({'0': coords[:, 0], '1': coords[:, 1], 'cluster': communities_labelprop},
-                             index=tenx.genes.rows[::skip])
-
-    file_name = file_format.format('smushed', 'csv')
-    coords_df.to_csv(file_name)
-
-    file_name = file_format.format('embedding','png')
-    plot_labelprop_mpl(coords, communities_labelprop, title=f'{tissue}: Graph layout of clusters',
-                       file_name=file_name)
-
-    return communities_labelprop
-
-
-def diff_exp_clusters(cluster_expression_df, cluster_sizes, file_format):
+def diff_exp_clusters(Z, expression_df, clusters):
+    cluster_sizes = dict(Counter(clusters).most_common())
     n_clusters = len(cluster_sizes)
 
-    cluster_sum_umi = np.vstack(
-            [cluster_sizes[c] * cluster_expression_df[f'Cluster {c} mean UMI'].values
-             for c in range(n_clusters)]
-    )
-
-    cluster_ssq_umi = np.vstack(
-            [cluster_sizes[c] * (cluster_expression_df[f'Cluster {c} std UMI'].values ** 2
-                     + cluster_expression_df[f'Cluster {c} mean UMI'].values ** 2)
-             for c in range(n_clusters)]
-    )
-
-    Z = fastcluster.linkage(cluster_sum_umi, method='average', metric='cosine')
-
-    fig = matplotlib.figure.Figure(figsize=(12, 12))
-
-    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-    scipy.cluster.hierarchy.dendrogram(Z, ax=ax,
-                                       color_threshold=0, above_threshold_color='grey')
-
-    ax.set_title('Hierarchical structure of cell-type clusters')
-    ax.set_xlabel('Cluster Label')
-    ax.tick_params(labelleft='off')
-
-    FigureCanvasAgg(fig).print_figure(file_format.format('dendrogram', 'png'))
-
+    cluster_sum_umi = expression_df.groupby(clusters).sum()
+    cluster_ssq_umi = expression_df.groupby(clusters).apply(
+            lambda df: (df ** 2).sum())
 
     root, rd = scipy.cluster.hierarchy.to_tree(Z, rd=True)
 
@@ -220,74 +122,19 @@ def diff_exp_clusters(cluster_expression_df, cluster_sizes, file_format):
     return group_list
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument('--data_folder')
-    parser.add_argument('--n_samples', type=int, default=-1)
-    parser.add_argument('--tissues', nargs='*', default=None)
-    parser.add_argument('--k', type=int, default=25)
+def batch_plots(tenx, coords):
+    """Generate heatmaps to diagnose batch effects across the clustering"""
 
-    args = parser.parse_args()
+    cell_metadata = tenx.cell_metadata.join(coords)
 
-    if args.tissues is None:
-        args.tissues = all_tissues
+    fig,ax = plt.subplots(1, 2, figsize=(18,6))
 
-    for tissue in args.tissues:
-        print(f'Processing {tissue}...')
-        tenx = load_tissue(tissue, args.data_folder,
-                           channels_to_use=channels_to_use)
+    sns.heatmap(np.log10(pd.crosstab(cell_metadata['cluster'],
+                                     cell_metadata['Mouse'])+1),
+                annot=True, fmt="d", ax=ax[0])
+    sns.heatmap(np.log10(pd.crosstab(cell_metadata['cluster'],
+                                     cell_metadata['Sex'])+1),
+                annot=True, fmt="d", ax=ax[1])
 
-
-        if not os.path.exists(os.path.join(f'{args.data_folder}',
-                                           '10x_data', 'tissues', tissue)):
-            os.mkdir(os.path.join(f'{args.data_folder}',
-                                  '10x_data', 'tissues', tissue))
-
-        if args.n_samples < 1:
-            skip = 1
-            file_format = os.path.join(args.data_folder, '10x_data', 'tissues',
-                                       tissue, '{}.{}')
-        else:
-            skip = tenx.genes.matrix.shape[0] // args.n_samples
-            skip = max(skip, 1)
-
-            file_format = os.path.join(
-                    args.data_folder, '10x_data', 'tissues', tissue,
-                    f'{{}}-{tissue}-{args.n_samples}-{args.k}.{{}}'
-            )
-
-        clusters = cluster(tenx, skip, file_format=file_format,
-                           k=args.k, tissue=tissue)
-
-        print('Computing cluster expression...')
-
-        # genewise mean expression and percent non-zero for each cluster
-        cluster_expression_df = cluster_expression(tenx, clusters, skip)
-
-        # drop zeros
-        cluster_expression_df = cluster_expression_df.loc[
-            cluster_expression_df.max(axis=1) != 0
-        ]
-
-        # round for readability and output to csv
-        cluster_expression_df = np.round(cluster_expression_df, 2)
-        cluster_expression_df.to_csv(file_format.format('cluster-expression', 'csv'))
-
-        cluster_sizes = dict(Counter(clusters).most_common())
-
-        print('Computing differential expression...')
-
-        group_list = diff_exp_clusters(cluster_expression_df, cluster_sizes,
-                                       file_format)
-
-        with open(file_format.format('summary', 'txt'), 'w') as OUT:
-            print('Clustered {} cells into {} clusters'.format(
-                    sum(cluster_sizes.values()), len(cluster_sizes)),
-                  file=OUT)
-            print('\t'.join(('group', 'n_cells', 'member_clusters')), file=OUT)
-            for i,gl in group_list[:-1]:
-                print('{}\t{}\t{}'.format(i, sum(cluster_sizes[j] for j in gl),
-                                          ', '.join(map(str, sorted(gl)))),
-                      file=OUT)
-            print('total\t{}'.format(sum(cluster_sizes.values())), file=OUT)
+    plt.show()
