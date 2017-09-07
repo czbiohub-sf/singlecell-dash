@@ -23,6 +23,19 @@ from sklearn.neighbors import NearestNeighbors
 import singlecell_dash.common as common
 
 
+TISSUES = {'Tongue', 'Liver', 'Bladder', 'Kidney', 'Spleen', 'Marrow',
+           'Lung', 'Muscle', 'Heart', 'Thymus', 'Mammary'}
+
+AGE_3M_SAMPLES = {'10X_P4_0', '10X_P4_1', '10X_P4_2', '10X_P4_3',
+                  '10X_P4_4', '10X_P4_5', '10X_P4_6', '10X_P4_7',
+                  '10X_P6_0', '10X_P6_1', '10X_P6_2', '10X_P6_3',
+                  '10X_P6_4', '10X_P6_5', '10X_P6_6', '10X_P6_7',
+                  '10X_P7_0', '10X_P7_1', '10X_P7_2', '10X_P7_3',
+                  '10X_P7_4', '10X_P7_5', '10X_P7_6', '10X_P7_7',
+                  '10X_P7_8', '10X_P7_9', '10X_P7_10', '10X_P7_11',
+                  '10X_P7_12', '10X_P7_13', '10X_P7_14', '10X_P7_15'}
+
+
 class HandlerCircle(HandlerPatch):
     def create_artists(self, legend, orig_handle,
                        xdescent, ydescent, width, height, fontsize, trans):
@@ -61,48 +74,6 @@ def plot_labelprop_mpl(coords, communities, file_name=None, title=''):
         FigureCanvasAgg(fig).print_figure(file_name)
 
 
-def label_propagation(G, verbose=False):
-    node_labels = {node: i for i, node in enumerate(G.nodes())}
-
-    n_changes = 1
-    while n_changes:
-        n_changes = 0
-        for node in G.nodes():
-            neighbor_labels = Counter([node_labels[n] for n in G.neighbors(node)])
-            pop_label = neighbor_labels.most_common(1)[0][0]
-            if node_labels[node] != pop_label:
-                node_labels[node] = pop_label
-                n_changes += 1
-        if verbose:
-            print("Round with ", n_changes, " to labels.")
-
-    label_renames = {label: i for i, (label, c)
-                     in enumerate(Counter(node_labels.values()).most_common())}
-
-    for node in node_labels:
-        node_labels[node] = label_renames[node_labels[node]]
-
-    if verbose:
-        print("Most common labels, in the form label, frequency")
-        print(Counter(node_labels.values()).most_common())
-
-    return node_labels
-
-
-def network_layout(matrix, k=30):
-    nbrs = NearestNeighbors(k, algorithm='brute',
-                            metric='cosine').fit(matrix)
-    G = networkx.from_scipy_sparse_matrix(nbrs.kneighbors_graph(matrix))
-
-    node_labels = label_propagation(G, verbose=True)
-    communities_labelprop = np.array([node_labels[i] for i in range(matrix.shape[0])])
-
-    pos = graphviz_layout(G, prog="sfdp")
-    coords = np.array([pos[i] for i in range(len(pos))])
-    print(coords.shape)
-
-    return coords, communities_labelprop
-
 
 def expression(matrix, group):
     g = matrix[group,:].tocsc()
@@ -124,16 +95,6 @@ def cluster_expression(tenx, clusters, skip=1):
 
     return df
 
-
-def load_tissue(tissue, data_folder, channels_to_use = None):
-
-    genes_to_drop = 'Malat1|Rn45s|Rpl10|Rpl10a|Rpl10l|Rpl11|Rpl12|Rpl13|Rpl13a|Rpl14|Rpl15|Rpl17|Rpl18|Rpl18a|Rpl19|Rpl21|Rpl22|Rpl22l1|Rpl23|Rpl23a|Rpl24|Rpl26|Rpl27|Rpl27a|Rpl28|Rpl29|Rpl3|Rpl30|Rpl31|Rpl31-ps12|Rpl32|Rpl34|Rpl34-ps1|Rpl35|Rpl35a|Rpl36|Rpl36a|Rpl36al|Rpl37|Rpl37a|Rpl38|Rpl39|Rpl39l|Rpl3l|Rpl4|Rpl41|Rpl5|Rpl6|Rpl7|Rpl7a|Rpl7l1|Rpl8|Rpl9|Rplp0|Rplp1|Rplp2|Rplp2-ps1|Rps10|Rps11|Rps12|Rps13|Rps14|Rps15|Rps15a|Rps15a-ps4|Rps15a-ps6|Rps16|Rps17|Rps18|Rps19|Rps19-ps3|Rps19bp1|Rps2|Rps20|Rps21|Rps23|Rps24|Rps25|Rps26|Rps27|Rps27a|Rps27l|Rps28|Rps29|Rps3|Rps3a|Rps4x|Rps4y2|Rps5|Rps6|Rps6ka1|Rps6ka2|Rps6ka3|Rps6ka4|Rps6ka5|Rps6ka6|Rps6kb1|Rps6kb2|Rps6kc1|Rps6kl1|Rps7|Rps8|Rps9|Rpsa'.split(
-        '|')
-
-    tenx = common.TenX_Runs(data_folder, tissue=tissue, verbose=True, genes_to_drop=genes_to_drop,
-                            channels_to_use=channels_to_use)
-
-    return tenx
 
 
 def cluster(tenx, skip, file_format, k, tissue):
@@ -260,18 +221,6 @@ def diff_exp_clusters(cluster_expression_df, cluster_sizes, file_format):
 
 
 if __name__ == '__main__':
-    all_tissues = ['Tongue', 'Liver', 'Bladder', 'Kidney', 'Spleen', 'Marrow',
-                   'Lung', 'Muscle', 'Heart', 'Thymus', 'Mammary']
-
-    channels_to_use = ['10X_P4_0', '10X_P4_1', '10X_P4_2', '10X_P4_3',
-                       '10X_P4_4', '10X_P4_5', '10X_P4_6', '10X_P4_7',
-                       '10X_P6_0', '10X_P6_1', '10X_P6_2', '10X_P6_3',
-                       '10X_P6_4', '10X_P6_5', '10X_P6_6', '10X_P6_7',
-                       '10X_P7_0', '10X_P7_1', '10X_P7_2', '10X_P7_3',
-                       '10X_P7_4', '10X_P7_5', '10X_P7_6', '10X_P7_7',
-                       '10X_P7_8', '10X_P7_9', '10X_P7_10', '10X_P7_11',
-                       '10X_P7_12', '10X_P7_13', '10X_P7_14', '10X_P7_15']
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data_folder')

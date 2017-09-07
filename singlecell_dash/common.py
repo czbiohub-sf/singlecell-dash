@@ -1,18 +1,15 @@
+import datetime
 import glob
 import os
-import datetime
-
 from collections import OrderedDict
 
-import pandas as pd
 import numpy as np
-
+import pandas as pd
+import scipy.sparse as sparse
+import scipy.stats as stats
 from sklearn.manifold import TSNE
 
-import scipy.stats as stats
-import scipy.sparse as sparse
-
-from sparse_dataframe import SparseDataFrame
+from singlecell_dash.sparse_dataframe import SparseDataFrame
 
 
 def combine_sdf_files(run_folder, folders, verbose=False, **kwargs):
@@ -410,27 +407,40 @@ class TenX_Runs(Plates):
                           'Q30 Bases in Sample Index', 'Q30 Bases in UMI',
                           'Fraction Reads in Cells'}
 
-    def __init__(self, data_folder, genes_to_drop='Rn45s',
-                 verbose=False, nrows=None, tissue=None,
-                 channels_to_use=None, tissue_folder='tissues'):
+    def __init__(self, data_folder, genes_to_drop='Rn45s', verbose=False,
+                 filters=None):
+        """
+        Read in a set of 10X runs and process the data
+
+        :param data_folder: folder containing the data (not including
+            '10x_data')
+        :param genes_to_drop: genes to remove from the data
+        :param verbose: print out what is getting loaded
+        :param filters: dictionary of [Metadata column]: [values] filters to
+            apply before loading data. Value should be a list. e.g.
+                {'Sex': ['M'], 'Age': [1, 3]} => male mice, age 1 or 3 months
+                {'Tissue': ['Liver', 'Lung']} => all liver and lung samples
+                {'CHANNEL_MAPPING': [channels_to_use]} => restrict to channels
+        """
 
         run_folder = os.path.join(data_folder, '10x_data')
 
         self.plate_metadata = combine_csv_files(run_folder,
                                                 'MACA_10X_P*.csv',
-                                                index_col=0, nrows=nrows)
+                                                index_col=0)
+        self.plate_metadata['Age'] = self.plate_metadata['Mouse'].map(
+                lambda x: int(x.split('-')[0])
+        )
+        self.plate_metadata['Sex'] = self.plate_metadata['Mouse'].map(
+                lambda x: x.split('-')[1]
+        )
 
-        if tissue is not None:
-            tissues = tissue.split(',')
-            folders = self.plate_metadata.index[self.plate_metadata['Tissue'].isin(tissues)]
-
+        if filters is not None:
+            folders = self.plate_metadata.query(
+                    ' & '.join(f'{k} in {filters[k]}' for k in filters)
+            ).index
         else:
             folders = self.plate_metadata.index
-
-        folders = [f for f in folders if os.path.exists(os.path.join(run_folder, f))]
-
-        if channels_to_use is not None:
-            folders = [f for f in folders if f in channels_to_use]
 
         counts = combine_sdf_files(run_folder, folders,
                                    verbose=verbose)
@@ -546,8 +556,6 @@ class TenX_Runs(Plates):
             began, number of input reads, number of mapped reads, and other
             information output by CellRanger, with numbers properly formatted
         """
-        # counts.sort_index(inplace=True)
-        # channel_ids = counts.index.get_level_values(0)
         channel_ids = [c.rsplit('_', 1)[0] for c in counts.rows]
 
         mapping_stats = clean_mapping_stats(
@@ -556,9 +564,6 @@ class TenX_Runs(Plates):
         )
 
         sample_ids = pd.Series(counts.rows)
-        #         '{}_{}'.format(channel, index) for channel, index in
-        #         counts.index
-        # )
 
         cell_metadata = pd.DataFrame(
                 index=sample_ids,
@@ -567,11 +572,14 @@ class TenX_Runs(Plates):
 
         counts.index = sample_ids
 
+        no_counts = np.asarray(counts.matrix.tocsc().max(axis=0) == 0).flatten()
+
         # Separate spike-ins (ERCCs) and genes
         ercc_names = [col for col in counts.columns if col.startswith('ERCC-')]
-        gene_names = [col for col in counts.columns if
+        gene_names = [col for i,col in enumerate(counts.columns) if
                       not (col.startswith('ERCC-')
-                           or col.endswith('_transgene'))]
+                           or col.endswith('_transgene')
+                           or no_counts[i])]
 
         # Separate counts of everything from genes-only
         genes = SparseDataFrame()
