@@ -134,12 +134,13 @@ class HandlerCircle(HandlerPatch):
 
 def plot_labelprop(coords_df:pd.DataFrame, Z, color_by,
                    cmap=None, file_name=None, **scatter_kwargs):
-    unique_clusters = np.unique(color_by)
+    unique_colors = np.unique(color_by)
+    clusters = scipy.cluster.hierarchy.leaves_list(Z)
 
     default_kwargs = dict(s=40, alpha=0.8, linewidth=0)
     default_kwargs.update(scatter_kwargs)
 
-    if len(unique_clusters) < 30:
+    if len(unique_colors) < 30:
         discrete_data = True
         norm = matplotlib.colors.NoNorm()
 
@@ -162,7 +163,8 @@ def plot_labelprop(coords_df:pd.DataFrame, Z, color_by,
 
     ax[0].scatter(coords2['0'], coords2['1'], color=cmap(norm(color_by2)),
                   **default_kwargs)
-    ax[0].tick_params(left='off', labelleft='off', bottom='off', labelbottom='off')
+    ax[0].tick_params(left='off', labelleft='off',
+                      bottom='off', labelbottom='off')
 
     ax[0].set_title('Network Layout')
 
@@ -175,7 +177,7 @@ def plot_labelprop(coords_df:pd.DataFrame, Z, color_by,
         y = dc[1]
 
         ax[1].plot(x, y, 'o', c='grey')
-        ax[1].annotate(i + len(unique_clusters), (x, y), xytext=(0, -5),
+        ax[1].annotate(i + len(clusters), (x, y), xytext=(0, -5),
                        textcoords='offset points', fontsize='large', va='top',
                        ha='center')
 
@@ -186,7 +188,7 @@ def plot_labelprop(coords_df:pd.DataFrame, Z, color_by,
 
     if discrete_data:
         lbl_rects = [(Circle((0, 0), 1, color=cmap(c)), c)
-                     for c in unique_clusters]
+                     for c in sorted(clusters)]
 
         fig.legend(*zip(*lbl_rects), **{'handler_map': {Circle: HandlerCircle()},
                                         'loc'        : 7, 'fontsize': 'large'})
