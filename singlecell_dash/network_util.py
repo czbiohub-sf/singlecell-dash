@@ -36,6 +36,9 @@ class KNNCache(object):
             self.knn_array = cosine_distances(
                     data_or_filename).argsort(axis=1)[:,:max_k]
             self.max_k = max_k
+        elif isinstance(data_or_filename, np.ndarray):
+            self.knn_array = data_or_filename
+            self.max_k = self.knn_array.shape[1]
         elif isinstance(data_or_filename, str):
             if os.path.exists(data_or_filename):
                 self.knn_array = np.load(data_or_filename)
@@ -56,6 +59,22 @@ class KNNCache(object):
         return networkx.from_dict_of_lists({
             i:self.knn_array[i,:k] for i in range(self.knn_array.shape[0])
         })
+
+    def subset_cache(self, index):
+        index = sorted(index)
+        index_d = {j:i for i,j in enumerate(index)}
+
+        # subset and translate rows
+        knn_subset = []
+        for i in index:
+            knn_subset.append([index_d[j] for j in self.knn_array[i,:]
+                               if j in index_d])
+
+        max_k = min(len(ks) for ks in knn_subset)
+
+        knn_subset = np.vstack([ks[:max_k] for ks in knn_subset])
+
+        return KNNCache(knn_subset)
 
 
 def label_propagation(exp_df:pd.DataFrame,

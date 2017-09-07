@@ -37,18 +37,19 @@ AGE_3M_SAMPLES = {'10X_P4_0', '10X_P4_1', '10X_P4_2', '10X_P4_3',
                   '10X_P7_12', '10X_P7_13', '10X_P7_14', '10X_P7_15'}
 
 
-def diff_exp_clusters(Z, expression_df, clusters):
+def diff_exp_clusters(Z, expression_df, clusters, verbose=False):
     cluster_sizes = dict(Counter(clusters).most_common())
     n_clusters = len(cluster_sizes)
 
-    cluster_sum_umi = expression_df.groupby(clusters).sum()
+    cluster_sum_umi = expression_df.groupby(clusters).sum().values
     cluster_ssq_umi = expression_df.groupby(clusters).apply(
-            lambda df: (df ** 2).sum())
+            lambda df: (df ** 2).sum()).values
 
     root, rd = scipy.cluster.hierarchy.to_tree(Z, rd=True)
 
-    def de(lbl_1, lbl_2, group1, group2):
-        print(f'Comparing {group1} to {group2}')
+    def de(group1, group2):
+        if verbose:
+            print(f'Comparing {group1} to {group2}')
 
         group1_n_cells = sum(cluster_sizes[c] for c in group1)
         group2_n_cells = sum(cluster_sizes[c] for c in group2)
@@ -78,17 +79,17 @@ def diff_exp_clusters(Z, expression_df, clusters):
                                        ('p', p_vals),
                                        ('group1', group1_mean),
                                        ('group2', group2_mean)]),
-                          index=cluster_expression_df.index)
+                          index=expression_df.columns)
 
         df = df[df['p'] < 0.001]
         df['diff'] = df['group1'] - df['group2']
 
         df.sort_values('diff', ascending=False, inplace=True)
 
-        name = f'differential_gene_expression_{lbl_1}_v_{lbl_2}'
+        return df
 
-        df.to_csv(file_format.format(name, 'csv'))
 
+    de_dict = dict()
 
     for i in range(0, 2 * n_clusters - 1):
         if i >= n_clusters:
@@ -103,7 +104,8 @@ def diff_exp_clusters(Z, expression_df, clusters):
                                             or len(right_clusters) == 1):
                 continue
 
-            de(left_child.id, right_child.id, left_clusters, right_clusters)
+            de_dict[left_child.id, right_child.id] = de(left_clusters,
+                                                        right_clusters)
 
         if i < 2 * n_clusters - 2:
             below = rd[i].pre_order(lambda x: x.id)
@@ -113,13 +115,9 @@ def diff_exp_clusters(Z, expression_df, clusters):
             if len(above) == 1:
                 continue
 
-            de(i, 'all', below, above)
+            de_dict[i, 'all'] = de(below, above)
 
-    group_list = [(i, rd[i].pre_order(lambda x: x.id))
-                  for i in range(0, 2 * n_clusters - 1)]
-    group_list[-1] = ('total', group_list[-1][1])
-
-    return group_list
+    return de_dict
 
 
 
