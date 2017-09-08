@@ -132,8 +132,8 @@ class HandlerCircle(HandlerPatch):
         return [p]
 
 
-def plot_labelprop(coords_df:pd.DataFrame, Z, color_by,
-                   cmap=None, file_name=None, **scatter_kwargs):
+def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
+                    cmap=None, file_name=None, **scatter_kwargs):
     unique_colors = np.unique(color_by)
     clusters = scipy.cluster.hierarchy.leaves_list(Z)
 
@@ -171,8 +171,9 @@ def plot_labelprop(coords_df:pd.DataFrame, Z, color_by,
     ddata = scipy.cluster.hierarchy.dendrogram(Z, ax=ax[1], color_threshold=0,
                                                above_threshold_color='grey')
 
-    for i, (ic, dc) in enumerate(zip(ddata['icoord'][:-1],
-                                     ddata['dcoord'][:-1])):
+    for i, (ic, dc) in enumerate(sorted(zip(ddata['icoord'][:-1],
+                                            ddata['dcoord'][:-1]),
+                                        key=lambda icdc: icdc[1][1])):
         x = 0.5 * sum(ic[1:3])
         y = dc[1]
 

@@ -1,40 +1,59 @@
 
-import argparse
 import os
 from collections import Counter, OrderedDict
 
-import fastcluster
-import matplotlib.colors
-import matplotlib.figure
-
-import networkx
 import numpy as np
 import pandas as pd
 import scipy.cluster.hierarchy
 import scipy.stats as stats
 import seaborn as sns
 
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-from matplotlib.legend_handler import HandlerPatch
-from matplotlib.patches import Circle
+sns.set(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
 
-from networkx.drawing.nx_agraph import graphviz_layout
-from sklearn.neighbors import NearestNeighbors
+import matplotlib.pyplot as plt
 
 import singlecell_dash.common as common
+import singlecell_dash.network_util as nutil
 
+import hermione as hm
+
+
+__all__ = ['TISSUES', 'load_tissue', 'cluster_tissue',
+           'diff_exp_clusters', 'batch_plots',
+           'subset_exp', 'plot_gene_joyplot']
 
 TISSUES = {'Tongue', 'Liver', 'Bladder', 'Kidney', 'Spleen', 'Marrow',
            'Lung', 'Muscle', 'Heart', 'Thymus', 'Mammary'}
 
-AGE_3M_SAMPLES = {'10X_P4_0', '10X_P4_1', '10X_P4_2', '10X_P4_3',
-                  '10X_P4_4', '10X_P4_5', '10X_P4_6', '10X_P4_7',
-                  '10X_P6_0', '10X_P6_1', '10X_P6_2', '10X_P6_3',
-                  '10X_P6_4', '10X_P6_5', '10X_P6_6', '10X_P6_7',
-                  '10X_P7_0', '10X_P7_1', '10X_P7_2', '10X_P7_3',
-                  '10X_P7_4', '10X_P7_5', '10X_P7_6', '10X_P7_7',
-                  '10X_P7_8', '10X_P7_9', '10X_P7_10', '10X_P7_11',
-                  '10X_P7_12', '10X_P7_13', '10X_P7_14', '10X_P7_15'}
+
+def load_tissue(data_folder, tissue):
+    """Load all the 3-month data for the chosen tissue"""
+
+    # load in data with appropriate subsets
+    tenx = common.TenX_Runs(data_folder,
+                            filters={'Age': [3], 'Tissue': [tissue]},
+                            verbose=True)
+
+    exp_df = pd.DataFrame(tenx.genes.matrix.todense(),
+                          index=tenx.genes.rows,
+                          columns=tenx.genes.columns)
+
+    knn_cache_file = os.path.join(data_folder, 'knncache',
+                                  f'{tissue}-k-500.npy')
+
+    knn_cache = nutil.KNNCache(knn_cache_file)
+
+    return tenx,exp_df,knn_cache
+
+
+def cluster_tissue(exp_df:pd.DataFrame,
+                   knn_cache:nutil.KNNCache, k:int):
+    knn_graph = knn_cache.get_knn_graph(k=25)  # change k here
+
+    coords = nutil.network_layout(exp_df.index, knn_graph)
+    coords['cluster'], Z = nutil.label_propagation(exp_df, knn_graph)
+
+    return coords, Z
 
 
 def diff_exp_clusters(Z, expression_df, clusters, verbose=False):
@@ -120,7 +139,6 @@ def diff_exp_clusters(Z, expression_df, clusters, verbose=False):
     return de_dict
 
 
-
 def batch_plots(tenx, coords):
     """Generate heatmaps to diagnose batch effects across the clustering"""
 
@@ -135,4 +153,26 @@ def batch_plots(tenx, coords):
                                      cell_metadata['Sex'])+1),
                 annot=True, fmt="d", ax=ax[1])
 
+    plt.show()
+
+
+def subset_exp(tenx, exp_df, filters, knncache):
+    samples = tenx.cell_metadata.query(
+            ' & '.join(f'{k} in {filters[k]}' for k in filters)
+    ).index
+
+    exp_subset = exp_df.loc[samples]
+
+    if knncache is not None:
+        ix = np.where(tenx.cell_metadata.index.isin(samples))[0]
+        knn_subset = knncache.subset_cache(ix)
+        return exp_subset, knn_subset
+    else:
+        return exp_subset
+
+
+def plot_gene_joyplot(exp_df:pd.DataFrame, coords:pd.DataFrame,
+                      gene:str, Z:np.ndarray):
+    hm.joyplot(np.log2(exp_df + 1).join(coords), gene, 'cluster',
+               scipy.cluster.hierarchy.leaves_list(Z))
     plt.show()
