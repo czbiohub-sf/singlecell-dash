@@ -48,7 +48,7 @@ def load_tissue(data_folder, tissue):
 
 def cluster_tissue(exp_df:pd.DataFrame,
                    knn_cache:nutil.KNNCache, k:int):
-    knn_graph = knn_cache.get_knn_graph(k=25)  # change k here
+    knn_graph = knn_cache.get_knn_graph(k=k)  # change k here
 
     coords = nutil.network_layout(exp_df.index, knn_graph)
     coords['cluster'], Z = nutil.label_propagation(exp_df, knn_graph)
@@ -100,7 +100,7 @@ def diff_exp_clusters(Z, expression_df, clusters, verbose=False):
                                        ('group2', group2_mean)]),
                           index=expression_df.columns)
 
-        df = df[df['p'] < 0.001]
+        df = df[df['p'] < 0.01]
         df['diff'] = df['group1'] - df['group2']
 
         df.sort_values('diff', ascending=False, inplace=True)
