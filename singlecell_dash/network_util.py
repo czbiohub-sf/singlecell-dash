@@ -133,14 +133,14 @@ class HandlerCircle(HandlerPatch):
 
 
 def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
-                    cmap=None, file_name=None, **scatter_kwargs):
+                    cmap=None, file_name=None, discrete_data=True, **scatter_kwargs):
     unique_colors = np.unique(color_by)
     clusters = scipy.cluster.hierarchy.leaves_list(Z)
 
     default_kwargs = dict(s=40, alpha=0.8, linewidth=0)
     default_kwargs.update(scatter_kwargs)
 
-    if len(unique_colors) < 30:
+    if discrete_data:
         discrete_data = True
         norm = matplotlib.colors.NoNorm()
 

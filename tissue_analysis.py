@@ -43,7 +43,7 @@ def load_tissue(data_folder, tissue):
 
     knn_cache = nutil.KNNCache(knn_cache_file)
 
-    return tenx,exp_df,knn_cache
+    return tenx, exp_df, knn_cache
 
 
 def cluster_tissue(exp_df:pd.DataFrame,
@@ -156,16 +156,21 @@ def batch_plots(tenx, coords):
     plt.show()
 
 
-def subset_exp(tenx, exp_df, filters, knncache):
-    samples = tenx.cell_metadata.query(
-            ' & '.join(f'{k} in {filters[k]}' for k in filters)
-    ).index
+def subset_exp(tenx, exp_df, filters=None, samples=None, knn_cache=None):
+    if samples is None:
+        samples = exp_df.index
+
+    if filters is not None:
+        filtered_samples = tenx.cell_metadata.query(
+                ' & '.join(f'{k} in {filters[k]}' for k in filters)
+        ).index
+        samples = [s for s in samples if s in filtered_samples]
 
     exp_subset = exp_df.loc[samples]
 
-    if knncache is not None:
+    if knn_cache is not None:
         ix = np.where(tenx.cell_metadata.index.isin(samples))[0]
-        knn_subset = knncache.subset_cache(ix)
+        knn_subset = knn_cache.subset_cache(ix)
         return exp_subset, knn_subset
     else:
         return exp_subset
