@@ -26,7 +26,7 @@ TISSUES = {'Tongue', 'Liver', 'Bladder', 'Kidney', 'Spleen', 'Marrow',
            'Lung', 'Muscle', 'Heart', 'Thymus', 'Mammary'}
 
 
-def load_tissue(data_folder, tissue):
+def load_tissue(data_folder, tissue, max_k=500):
     """Load all the 3-month data for the chosen tissue"""
 
     # load in data with appropriate subsets
@@ -38,10 +38,13 @@ def load_tissue(data_folder, tissue):
                           index=tenx.genes.rows,
                           columns=tenx.genes.columns)
 
-    knn_cache_file = os.path.join(data_folder, 'knncache',
-                                  f'{tissue}-k-500.npy')
+    try:
+        knn_cache_file = os.path.join(data_folder, 'knncache',
+                                      f'{tissue}-k-{max_k}.npy')
 
-    knn_cache = nutil.KNNCache(knn_cache_file)
+        knn_cache = nutil.KNNCache(knn_cache_file)
+    except ValueError:
+        knn_cache = nutil.KNNCache(tenx.genes.matrix, max_k=max_k)
 
     return tenx, exp_df, knn_cache
 
