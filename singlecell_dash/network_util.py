@@ -141,14 +141,12 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
     default_kwargs.update(scatter_kwargs)
 
     if discrete_data:
-        discrete_data = True
         norm = matplotlib.colors.NoNorm()
 
         if cmap is None:
             cmap = matplotlib.cm.tab20
             cmap.set_over('black')
     else:
-        discrete_data = False
         norm = matplotlib.colors.Normalize(*np.percentile(color_by, (1., 99.)))
 
         if cmap is None:
