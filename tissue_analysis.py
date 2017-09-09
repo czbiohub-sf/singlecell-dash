@@ -180,7 +180,11 @@ def subset_exp(tenx, exp_df, filters=None, samples=None, knn_cache=None):
 
 
 def plot_gene_joyplot(exp_df:pd.DataFrame, coords:pd.DataFrame,
-                      gene:str, Z:np.ndarray):
-    hm.joyplot(np.log2(exp_df + 1).join(coords), gene, 'cluster',
-               scipy.cluster.hierarchy.leaves_list(Z))
+                      gene:str, Z:np.ndarray, max_colors:int=20,
+                      cluster_col:str='cluster'):
+    n_clusters = len(coords[cluster_col].unique())
+    palette = sns.color_palette('tab20', n_colors=max_colors) + ['black'] * (n_clusters - max_colors)
+
+    hm.joyplot(np.log2(exp_df + 1).join(coords), gene, cluster_col,
+               scipy.cluster.hierarchy.leaves_list(Z), palette=palette)
     plt.show()
