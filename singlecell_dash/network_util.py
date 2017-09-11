@@ -134,25 +134,30 @@ class HandlerCircle(HandlerPatch):
 
 def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
                     cmap=None, file_name=None, discrete_data=True, **scatter_kwargs):
-    unique_colors = np.unique(color_by)
-    clusters = scipy.cluster.hierarchy.leaves_list(Z)
 
     default_kwargs = dict(s=40, alpha=0.8, linewidth=0)
     default_kwargs.update(scatter_kwargs)
 
     if discrete_data:
+        unique_colors = sorted(np.unique(color_by))
+        color_d = {c: i for i, c in enumerate(unique_colors)}
+
         norm = matplotlib.colors.NoNorm()
 
         if cmap is None:
             cmap = matplotlib.cm.tab20
             cmap.set_over('black')
+
+        if isinstance(unique_colors[0], str):
+            color_by = np.array([color_d[c] for c in color_by])
     else:
         norm = matplotlib.colors.Normalize(*np.percentile(color_by, (1., 99.)))
 
         if cmap is None:
             cmap = matplotlib.cm.viridis_r
 
-    # no particular reason to this if the coords aren't sorted by cluster
+    # no particular reason for this if the coords aren't sorted by cluster
+    # but in some cases the coloring might be related to order (e.g. batch)
     ix = np.random.permutation(np.arange(coords_df.shape[0], dtype=int))
     coords2 = coords_df.iloc[ix]
     color_by2 = color_by[ix]
@@ -168,6 +173,7 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
 
     ddata = scipy.cluster.hierarchy.dendrogram(Z, ax=ax[1], color_threshold=0,
                                                above_threshold_color='grey')
+    clusters = scipy.cluster.hierarchy.leaves_list(Z)
 
     for i, (ic, dc) in enumerate(sorted(zip(ddata['icoord'][:-1],
                                             ddata['dcoord'][:-1]),
@@ -186,8 +192,8 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
         ax[1].spines[s].set_visible(False)
 
     if discrete_data:
-        lbl_rects = [(Circle((0, 0), 1, color=cmap(c)), c)
-                     for c in sorted(clusters)]
+        lbl_rects = [(Circle((0, 0), 1, color=cmap(color_d[c])), c)
+                     for c in unique_colors]
 
         fig.legend(*zip(*lbl_rects), **{'handler_map': {Circle: HandlerCircle()},
                                         'loc'        : 7, 'fontsize': 'large'})
