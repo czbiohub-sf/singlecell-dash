@@ -13,6 +13,7 @@ import scipy.cluster.hierarchy
 from matplotlib.legend_handler import HandlerPatch
 from matplotlib.patches import Circle
 from networkx.drawing.nx_agraph import graphviz_layout
+import seaborn as sns
 from sklearn.metrics.pairwise import cosine_distances
 
 
@@ -133,12 +134,19 @@ class HandlerCircle(HandlerPatch):
 
 
 def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
-                    cmap=None, file_name=None, discrete_data=True, **scatter_kwargs):
+                    cmap=None, file_name=None, discrete_data=True,
+                    **scatter_kwargs):
     unique_colors = np.unique(color_by)
     clusters = scipy.cluster.hierarchy.leaves_list(Z)
 
-    default_kwargs = dict(s=40, alpha=0.8, linewidth=0)
+    default_kwargs = dict(s=40, alpha=0.8, linewidth=0.1,
+                          edgecolor='grey')
     default_kwargs.update(scatter_kwargs)
+
+    # no particular reason to this if the coords aren't sorted by cluster
+    ix = np.random.permutation(np.arange(coords_df.shape[0], dtype=int))
+    coords2 = coords_df.iloc[ix]
+    color_by2 = color_by[ix]
 
     if discrete_data:
         discrete_data = True
@@ -147,26 +155,25 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
         if cmap is None:
             cmap = matplotlib.cm.tab20
             cmap.set_over('black')
+        default_kwargs.update(dict(color=cmap(norm(color_by2))))
     else:
         discrete_data = False
-        norm = matplotlib.colors.Normalize(*np.percentile(color_by, (1., 99.)))
+        # norm = matplotlib.colors.Normalize(*np.percentile(color_by, (1., 99.)))
 
         if cmap is None:
             cmap = matplotlib.cm.viridis_r
+        default_kwargs.update(dict(c=color_by, vmin=0))
 
-    # no particular reason to this if the coords aren't sorted by cluster
-    ix = np.random.permutation(np.arange(coords_df.shape[0], dtype=int))
-    coords2 = coords_df.iloc[ix]
-    color_by2 = color_by[ix]
+    fig, ax = plt.subplots(1, 2, figsize=(18, 6), gridspec_kw={'wspace': 0.05})
 
-    fig,ax = plt.subplots(1, 2, figsize=(18,6), gridspec_kw={'wspace': 0.05})
-
-    ax[0].scatter(coords2['0'], coords2['1'], color=cmap(norm(color_by2)),
-                  **default_kwargs)
+    scatter = ax[0].scatter(coords2['0'], coords2['1'], **default_kwargs)
     ax[0].tick_params(left='off', labelleft='off',
                       bottom='off', labelbottom='off')
-
-    ax[0].set_title('Network Layout')
+    title = 'Network Layout'
+    if not discrete_data:
+        title += f' - {color_by.name} expression'
+        plt.colorbar(scatter, label=f'{color_by.name} log2(UMI + 1)')
+    ax[0].set(xticks=[], yticks=[], title=title)
 
     ddata = scipy.cluster.hierarchy.dendrogram(Z, ax=ax[1], color_threshold=0,
                                                above_threshold_color='grey')
@@ -181,11 +188,10 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
         ax[1].annotate(i + len(clusters), (x, y), xytext=(0, -5),
                        textcoords='offset points', fontsize='large', va='top',
                        ha='center')
+    sns.despine(bottom=True, left=True)
 
     ax[1].set_title('Hierarchical structure of cell clusters')
     ax[1].tick_params(labelleft='off', left='off')
-    for s in ('top', 'bottom', 'left', 'right'):
-        ax[1].spines[s].set_visible(False)
 
     if discrete_data:
         lbl_rects = [(Circle((0, 0), 1, color=cmap(c)), c)
