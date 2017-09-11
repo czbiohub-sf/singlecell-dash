@@ -109,3 +109,6 @@ ENV/
 
 # OS X stuff
 *.DS_Store
+
+# PyCharm nonsense
+.idea/

@@ -32,7 +32,7 @@ def combine_sdf_files(run_folder, folders, verbose=False, **kwargs):
             combined.matrix = sdf.matrix
         else:
             combined.matrix = sparse.vstack((combined.matrix, sdf.matrix),
-                                            format='csc')
+                                            format='csr')
 
     assert len(columns) == 1
 
@@ -411,7 +411,8 @@ class TenX_Runs(Plates):
                           'Fraction Reads in Cells'}
 
     def __init__(self, data_folder, genes_to_drop='Rn45s',
-                 verbose=False, nrows=None, tissue=None, channels_to_drop=[]):
+                 verbose=False, nrows=None, tissue=None,
+                 channels_to_use=None, tissue_folder='tissues'):
 
         run_folder = os.path.join(data_folder, '10x_data')
 
@@ -420,12 +421,15 @@ class TenX_Runs(Plates):
                                                 index_col=0)
 
         if tissue is not None:
-            folders = self.plate_metadata.index[self.plate_metadata['Tissue'] == tissue]
+            tissues = tissue.split(',')
+            folders = self.plate_metadata.index[self.plate_metadata['Tissue'].isin(tissues)]
         else:
             folders = self.plate_metadata.index
 
         folders = [f for f in folders if os.path.exists(os.path.join(run_folder, f))]
-        folders = [f for f in folders if f not in channels_to_drop]
+
+        if channels_to_use is not None:
+            folders = [f for f in folders if f in channels_to_use]
 
         counts = combine_sdf_files(run_folder, folders,
                                    verbose=verbose)
@@ -440,6 +444,17 @@ class TenX_Runs(Plates):
 
         self.plate_metadata = self.plate_metadata.loc[
             self.plate_summaries.index]
+
+        self.cell_metadata = self.cell_metadata.join(self.plate_metadata,
+                                                     on=self.SAMPLE_MAPPING)
+
+        smushed_folder = os.path.join(run_folder, tissue_folder)
+
+        if not os.path.exists(smushed_folder):
+            os.mkdir(smushed_folder)
+
+        self.cell_smushed = self.read_tissue_smushed(smushed_folder, verbose,
+                                                     tissue)
 
         self.gene_names = sorted(self.genes.columns)
         self.plate_metadata_features = sorted(self.plate_metadata.columns)
@@ -593,3 +608,22 @@ class TenX_Runs(Plates):
         )
 
         return plate_summaries
+
+    def read_tissue_smushed(self, folder, verbose=False, tissue=None):
+        smusheds = {}
+
+        if tissue is None:
+            globber = glob.iglob(os.path.join(folder, 'smushed-*'))
+        else:
+            globber = glob.iglob(os.path.join(folder, f'smushed-{tissue}*'))
+
+        for filename in globber:
+            if verbose:
+                print(f'Reading {filename} ...')
+            tissue = filename.split('smushed-')[-1].split('.')[0]
+            tissue = tissue.split('-')[0]
+            df = pd.read_csv(filename, index_col=0)
+            df.rename(columns={'0': 0, '1': 1}, inplace=True)
+            smusheds[tissue] = df
+            assert len(df.columns.difference([0, 1, 'cluster'])) == 0
+        return smusheds
