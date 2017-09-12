@@ -145,8 +145,8 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
 
     # no particular reason to this if the coords aren't sorted by cluster
     ix = np.random.permutation(np.arange(coords_df.shape[0], dtype=int))
-    coords2 = coords_df.iloc[ix]
-    color_by2 = color_by[ix]
+    coords = coords_df.iloc[ix]
+    color_by = color_by[ix]
 
     if discrete_data:
         discrete_data = True
@@ -155,7 +155,7 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
         if cmap is None:
             cmap = matplotlib.cm.tab20
             cmap.set_over('black')
-        default_kwargs.update(dict(color=cmap(norm(color_by2))))
+        default_kwargs.update(dict(color=cmap(norm(color_by))))
     else:
         discrete_data = False
         # norm = matplotlib.colors.Normalize(*np.percentile(color_by, (1., 99.)))
@@ -166,7 +166,7 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
 
     fig, ax = plt.subplots(1, 2, figsize=(18, 6), gridspec_kw={'wspace': 0.05})
 
-    scatter = ax[0].scatter(coords2['0'], coords2['1'], **default_kwargs)
+    scatter = ax[0].scatter(coords['0'], coords['1'], **default_kwargs)
     ax[0].tick_params(left='off', labelleft='off',
                       bottom='off', labelbottom='off')
     title = 'Network Layout'
