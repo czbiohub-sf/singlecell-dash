@@ -149,20 +149,25 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
     color_by = color_by[ix]
 
     if discrete_data:
-        discrete_data = True
+        unique_colors = sorted(np.unique(color_by))
+        color_d = {c: i for i, c in enumerate(unique_colors)}
+
         norm = matplotlib.colors.NoNorm()
 
         if cmap is None:
             cmap = matplotlib.cm.tab20
             cmap.set_over('black')
+
+        if isinstance(unique_colors[0], str):
+            color_by = np.array([color_d[c] for c in color_by])
         default_kwargs.update(dict(color=cmap(norm(color_by))))
     else:
         discrete_data = False
         # norm = matplotlib.colors.Normalize(*np.percentile(color_by, (1., 99.)))
 
         if cmap is None:
-            cmap = matplotlib.cm.viridis_r
-        default_kwargs.update(dict(c=color_by, vmin=0))
+            cmap = matplotlib.cm.magma_r
+        default_kwargs.update(dict(c=color_by, vmin=0, cmap=cmap))
 
     fig, ax = plt.subplots(1, 2, figsize=(18, 6), gridspec_kw={'wspace': 0.05})
 
@@ -194,8 +199,8 @@ def plot_clustering(coords_df:pd.DataFrame, Z, color_by,
     ax[1].tick_params(labelleft='off', left='off')
 
     if discrete_data:
-        lbl_rects = [(Circle((0, 0), 1, color=cmap(c)), c)
-                     for c in sorted(clusters)]
+        lbl_rects = [(Circle((0, 0), 1, color=cmap(color_d[c])), c)
+                     for c in unique_colors]
 
         fig.legend(*zip(*lbl_rects), **{'handler_map': {Circle: HandlerCircle()},
                                         'loc'        : 7, 'fontsize': 'large'})
