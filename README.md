@@ -1,3 +1,7 @@
+# ARCHIVED
+
+This repository was a work-in-progress during the best of times and it is no longer under develop. It may still contain some kernel of useful code, but it is not guaranteed to work at all.
+
 # singlecell-dash
 
 Dashboard for visualizing per-plate sequencing quality metrics and basic
